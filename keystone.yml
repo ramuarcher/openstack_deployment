@@ -1,0 +1,21 @@
+---
+ - hosts: openstack
+   remote_user: root
+   gather_facts: True
+   become: yes
+  
+   tasks: 
+#     - name: create database
+#       mysql_db: name=keystone state=present
+#       mysql_user: name=keystone password=keystone123 priv='keystone.*:ALL,GRANT' host=localhost
+     
+     - name: "Install Keystone"
+       yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
+       with_items: 
+         - openstack-keystone
+         - openstack-utils
+         - python-openstackclient
+         - httpd
+         - mod_wsgi     
+     - name: "Keystone configuration"
+       script:     
