@@ -4,9 +4,6 @@
    gather_facts: True
    become: yes
    
-#   vars: 
-#     - mysql_root_password: admin
-   
    tasks:
      - name: "install NTP Server"
        yum: name='*' state=latest 
@@ -34,24 +31,38 @@
        service: name=mariadb state=started enabled=true 
      
      - name: update mysql root password for all root accounts
-       mysql_user: name=root host={{ item }} password={{ mysql_root_password }}
+       mysql_user: name=root host={{ item }} password=admin
        with_items:
          - 127.0.0.1
          - ::1
          - localhost
-       ignore_errors: yes
 
+
+#     - name: mysql_secure_installation Command Test
+#       expect:
+#         command: mysql_secure_installation
+#         responses:
+#           'Enter current password for root \(enter for none\):': "\n"
+#           'Set root password? [Y/n]:': 'y'
+#           'New password:': 'admin'
+#           'Re-enter new password:': 'admin'
+#           'Remove anonymous users? [Y/n]:': 'y'
+#           'Disallow root login remotely? [Y/n]:': 'y'
+#           'Remove test database and access to it? [Y/n]:': 'y'
+#           'Reload privilege tables now? [Y/n]:': 'y'
+#
+#         echo: yes
      - name: copy .my.cnf file with root password credentials
        template: src=my.cnf.j2 dest=/root/.my.cnf owner=root mode=0600
 
-     - name: delete anonymous MySQL server user for $server_hostname
-       action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
+#     - name: delete anonymous MySQL server user for server_hostname
+#       action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
 
-     - name: delete anonymous MySQL server user for localhost
-       action: mysql_user user="" state="absent"
+#     - name: delete anonymous MySQL server user for localhost
+#       action: mysql_user user="" state="absent"
 
-     - name: remove the MySQL test database
-       action: mysql_db db=test state=absent
+#     - name: remove the MySQL test database
+#       action: mysql_db db=test state=absent
      
      - yum: name=epel-release state=present
      - name: "Install RabbitMQ and Memcached"
@@ -67,7 +78,6 @@
          - memcached
      - name: "add openstack user (set any password you like for password)"
        script: rabbitmqctl.sh            
-
          
        
    

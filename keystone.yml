@@ -5,9 +5,10 @@
    become: yes
   
    tasks: 
-#     - name: create database
-#       mysql_db: name=keystone state=present
-#       mysql_user: name=keystone password=keystone123 priv='keystone.*:ALL,GRANT' host=localhost
+     - name: create database
+       mysql_db: name=keystone state=present
+     - name: create user
+       mysql_user: name=keystone password=keystone123 priv='keystone.*:ALL,GRANT' host=localhost
      
      - name: "Install Keystone"
        yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
@@ -18,4 +19,32 @@
          - httpd
          - mod_wsgi     
      - name: "Keystone configuration"
-       script:     
+       lineinfile: dest=/etc/keystone/keystone.conf
+                   line={{ item.line }}
+                   insertafter={{ item.insertafter }}
+       with_items:
+         - { line: "connection = mysql+pymysql://keystone:keystone123@192.168.122.6/keystone", insertafter: "^#?connection = <None>" }
+         - { line: "servers = 192.168.122.6:11211", insertafter: '^\[memcache\]' }
+         - { line: "driver = memcache", insertafter: '^\[token\]' }
+         - { line: "provider = fernet", insertafter: '^\[token\]' }
+     - name: "Keystone DB Sync"
+#       script: keystone-db-sync.sh
+       command: 'keystone-manage db_sync'
+       become: true
+       become_method: su
+       become_user: keystone
+       become_flags: '-s /bin/sh'
+     - name: "Enableconfig for Keystone ans start Apache httpd"
+       shell: ln -s /usr/share/keystone/wsgi-keystone.conf /etc/httpd/conf.d/
+     - name: "start and enable apache"
+       service: name=httpd state=started enabled=yes
+     - name: "keystonerc"
+       copy: src=~/keystonerc dest=~/keystonerc mode=600
+     - name: "load keystonerc"
+       shell: source ~/keystonerc
+     - name: "Move to bashprofile"
+       shell: echo "source ~/keystonerc " >> ~/.bash_profile
+     - name: "Create projectss"
+       shell: openstack project create --domain default --description "Service Project" service
+       register: project
+     - debug: var=project.stdout_lines   
