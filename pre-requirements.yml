@@ -9,8 +9,6 @@
        yum: name='*' state=latest 
        yum: name=ntp state=present
      - service: name=ntpd state=started enabled=yes
-#     - shell: firewall-cmd --add-service=ntp --permanent
-#     - service: name=firewall-cmd state=reload
      
      - name: "Verify NTP Server"
        command: ntpq -p
@@ -78,6 +76,4 @@
          - memcached
      - name: "add openstack user (set any password you like for password)"
        script: rabbitmqctl.sh            
-         
-       
    
