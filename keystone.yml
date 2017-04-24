@@ -26,8 +26,8 @@
                    line={{ item.line }}
                    insertafter={{ item.insertafter }}
        with_items:
-         - { line: "connection = mysql+pymysql://keystone:keystone123@192.168.122.79/keystone", insertafter: "^#?connection = <None>" }
-         - { line: "servers = 192.168.122.79:11211", insertafter: '^\[memcache\]' }
+         - { line: "connection = mysql+pymysql://keystone:keystone123@192.168.122.238/keystone", insertafter: "^#?connection = <None>" }
+         - { line: "servers = 192.168.122.238:11211", insertafter: '^\[memcache\]' }
          - { line: "driver = memcache", insertafter: '^\[token\]' }
          - { line: "provider = fernet", insertafter: '^\[token\]' }
 
@@ -40,17 +40,13 @@
      - name: "start and enable apache"
        service: name=httpd state=started enabled=yes
      - name: "keystonerc"
-       copy: src=~/keystonerc dest=~/keystonerc mode=600
-     - name: "load keystonerc"
-       shell: source ~/keystonerc
-     - name: "Move to bashprofile"
-       shell: echo "source ~/keystonerc " >> ~/.bash_profile
+       copy: src=keystonerc dest=~/keystonerc mode=700
      - name: "Create projectss"
-       shell: "{{ item }}"
-       with_items: 
-         - source keystonerc
-         - openstack project list 
+       shell: . ~/keystonerc && ""openstack project create --domain default --description "Service Project" service""
+       args:
+         executable: /bin/bash
+#       with_items: 
 #         - openstack project create --domain default --description "Service Project" service
-#       shell: 'openstack project create --domain default --description "Service Project" service'
+#         - openstack service list
        register: project
      - debug: var=project.stdout_lines   

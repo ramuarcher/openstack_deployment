@@ -1,28 +1,38 @@
 ---
- - hosts: 
+ - hosts: openstack 
    remote_user: root
-   gather_facts: False
-   become: yes
+   gather_facts: yes
    
    tasks: 
      - name: "add glance user (set in service project)"
-       shell: openstack user create --domain default --project service --password servicepassword glance
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword glance
+       args: 
+         executable: /bin/bash
+       register: service
+     - debug: var=service.stdout_lines
+  
      - name: "Add glance user in admin role"
-       shell: openstack role add --project service --user glance admin
+       shell: source ~/keystonerc && openstack role add --project service --user glance admin
+       args:
+         executable: /bin/bash
+
      - name: "add service entry for glance"
-       shell: openstack service create --name glance --description "OpenStack Image service" image
+       shell: source ~/keystonerc && openstack service create --name glance --description "OpenStack Image service" image
+       args:
+         executable: /bin/bash
+  
      - name: "Export controller"
-       command: controller=192.168.122.34
+       shell: export controller=192.168.122.238
+       args: 
+         executable: /bin/bash
      - name: "add endpoint for glance (public)"
-       shell: openstack endpoint create --region RegionOne image {{ item }} http://$controller:9292
+       shell: source ~/keystonerc && openstack endpoint create --region RegionOne image {{ item }} http://$controller:9292
+       args:
+         executable: /bin/bash
        with_items:
          - public
          - internal
          - admin
-#     - name: "add endpoint for glance (internal)"
-#       shell: openstack endpoint create --region RegionOne image internal http://$controller:9292
-#     - name: "add endpoint for glance (admin)"
-#       shell: openstack endpoint create --region RegionOne image admin http://$controller:9292
 
      - name: create database
        mysql_db: name=glance state=present
@@ -30,12 +40,38 @@
        mysql_user: name=glance password=glance123 priv='glance.*:ALL,GRANT' host={{ item }}
        with_items: 
          - localhost
-         - %
-    - name: "Install Glance"
+         - '%'
+
+     - name: "Install Glance"
        yum: name=openstack-glance enablerepo=centos-openstack-ocata,epel state=present
-    - name: "Backup Original Glance configuation"
-      copy: remote_src=True src=/etc/glance/glance-api.conf dest=/etc/glance/glance-api.conf.org
-    - name: "copy glance configuation"
-      copy: src=glance-api.conf dest=/etc/glance/glance-api.conf mode=640 owner=root group=glance
-    - name: "Glance DB-Sync"
-      shell: su -s /bin/bash glance -c "glance-manage db_sync"     
+
+     - name: "Backup Original Glance configuation"
+       copy: remote_src=True src=/etc/glance/{{ item }} dest=/etc/glance/{{ item }}.org
+       with_items: 
+         - glance-api.conf
+         - glance-registry.conf 	
+
+     - name: "copy glance configuation"
+       copy: src={{ item }} dest=/etc/glance/{{ item }} mode=640 owner=root group=glance
+       with_items: 
+         - glance-api.conf
+         - glance-registry.conf
+
+     - name: "Glance DB-Syn"
+       shell: glance-manage db_sync
+       become: true
+       become_method: su
+       become_user: glance
+       become_flags: '-s /bin/bash'
+
+#     - name: "Glance DB Sync copy"
+#       copy: src=glance-db-sync.sh dest=~/glance-db-sync.sh mode=775 owner=root group=root
+#     - name: "Glance DB Sync"
+#       shell: sh glance-db-sync.sh
+
+        
+     - name: "glance-api and galnce-registry service start and enable"
+       service: name={{ item }} state=started enabled=yes
+       with_items: 
+         - openstack-glance-api
+         - openstack-glance-registry

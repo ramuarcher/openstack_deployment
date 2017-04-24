@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export controller=192.168.122.79
+export controller=192.168.122.238
 
 su -s /bin/bash keystone -c "keystone-manage db_sync"
 

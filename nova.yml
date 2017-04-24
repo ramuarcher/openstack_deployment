@@ -1,0 +1,116 @@
+---
+ - name: "Install and Configure OpenStack Compute Service (Nova)"   
+   hosts: openstack
+   remote_user: root
+   gather_facts: yes
+   
+   tasks: 
+     - name: "add nova user (set in service project)"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword nova 
+       args:
+         executable: /bin/bash
+       register: nova_user
+     - debug: var=nova_user.stdout_lines
+
+     - name: "add nova user in admin role"
+       shell: source ~/keystonerc && openstack role add --project service --user nova admin
+       args:
+         executable: /bin/bash
+
+     - name: "add placement user (set in service project)"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword placement  
+       args:
+         executable: /bin/bash
+       register: placement_user
+     - debug: var=placement_user.stdout_lines
+
+     - name: "add placement user in admin role"
+       shell: source ~/keystonerc && openstack role add --project service --user placement admin
+       args:
+         executable: /bin/bash
+
+
+     - name: "add service entry for nova"
+       shell: source ~/keystonerc && ""openstack service create --name nova --description "OpenStack Compute service" compute"" 
+       args:
+         executable: /bin/bash
+       register: add_service
+     - debug: var=add_service.stdout_lines
+
+     - name: "add service entry for placement"
+       shell: source ~/keystonerc && ""openstack service create --name placement --description "OpenStack Compute Placement service" placement""
+       args:
+         executable: /bin/bash
+       register: service_placement
+     - debug: var=service_placement.stdout_lines
+
+     - name: "Export controller"
+       shell: export controller=192.168.122.238
+       args:
+         executable: /bin/bash
+
+     - name: "add endpoint for nova (public,internal,admin)"
+       shell: source ~/keystonerc && openstack endpoint create --region RegionOne compute {{ item }} http://$controller:8774/v2.1/%\(tenant_id\)s
+       with_items: 
+         - public
+         - internal
+         - admin
+       register: echo
+     - debug: var={{ item }}.stdout_lines
+       with_items: echo.results
+     
+ 
+     - name: "create Nova database"
+       mysql_db: name={{ item }} state=present
+       with_items: 
+         - nova
+         - nova_api
+         - nova_placement
+         - nova_cell0
+
+       tags: db
+
+     - name: "create nova user"
+       mysql_user: name=nova password=nova123 priv='{{ item.priv }}.*:ALL,GRANT' host={{ item.host }}
+       with_items:
+         - { priv: "nova", host: "localhost" }
+         - { priv: "nova", host: "%" }
+         - { priv: "nova_api", host: "localhost" }
+         - { priv: "nova_api", host: "%" }
+#         - { priv: "nova_placement", host: "localhost" }
+#         - { priv: "nova_placement", host: "%" }
+#         - { priv: "nova_cell0", host: "localhost" }
+#         - { priv: "nova_cell0", host: "%" }
+       tags: databases
+
+     - name: "Install nova"
+       yum: name=openstack-nova enablerepo=centos-openstack-ocata,epel state=present
+     - name: "Backup Original nova configuation"
+       copy: remote_src=True src=/etc/nova/nova.conf dest=/etc/nova/nova.conf.org
+
+     - name: "copy nova configuation"
+       copy: src=nova.conf dest=/etc/nova/nova.conf mode=640 owner=root group=nova
+       
+     - name: "nova-placement-api configuration"
+       lineinfile: dest=/etc/httpd/conf.d/00-nova-placement-api.conf 
+                   line={{ item.line }}
+                   insertbefore={{ item.insertbefore }}
+       with_items:
+         - { line: "  </Directory>", insertbefore: "</VirtualHost>" }
+         - { line: "   Require all granted", insertbefore: "</Directory>" }
+         - { line: "  <Directory /usr/bin>", insertbefore: "Require all granted" }
+
+     - name: "Nova DB-Sync"
+       shell: nova-manage api_db sync
+       become: true
+       become_method: su
+       become_user: nova
+       become_flags: '-s /bin/bash'
+
+
+
+
+
+
+
+
