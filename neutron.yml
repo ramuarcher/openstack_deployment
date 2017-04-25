@@ -96,9 +96,9 @@
                    line={{ item.line }}
                    insertafter={{ item.insertafter }}
       with_items:
-        - { line: "extension_drivers = port_security", insertafter: '^\[memcache\]' }
-        - { line: "mechanism_drivers = openvswitch,l2population", insertafter: '^\[memcache\]' }
-        - { line: "tenant_network_types =", insertafter: '^\[memcache\]' }
-        - { line: "type_drivers = flat,vlan,gre,vxlan", insertafter: '^\[memcache\]' }
+        - { line: "extension_drivers = port_security", insertafter: '^\[ml2\]' }
+        - { line: "mechanism_drivers = openvswitch,l2population", insertafter: '^\[ml2\\]' }
+        - { line: "tenant_network_types =", insertafter: '^\[ml2\\]' }
+        - { line: "type_drivers = flat,vlan,gre,vxlan", insertafter: '^\[ml2\\]' }
         
 
