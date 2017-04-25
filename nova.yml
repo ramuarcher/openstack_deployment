@@ -71,17 +71,11 @@
        tags: db
 
      - name: "create nova user"
-       mysql_user: name=nova password=nova123 priv='{{ item.priv }}.*:ALL,GRANT' host={{ item.host }}
+       mysql_user: name=nova password=nova123 priv='nova.*:ALL,GRANT/nova_cell0.*:ALL,GRANT/nova_api.*:ALL,GRANT/nova_placement.*:ALL,GRANT' host={{ item }}
        with_items:
-         - { priv: "nova", host: "localhost" }
-         - { priv: "nova", host: "%" }
-         - { priv: "nova_api", host: "localhost" }
-         - { priv: "nova_api", host: "%" }
-#         - { priv: "nova_placement", host: "localhost" }
-#         - { priv: "nova_placement", host: "%" }
-#         - { priv: "nova_cell0", host: "localhost" }
-#         - { priv: "nova_cell0", host: "%" }
-       tags: databases
+          - localhost
+          - '%'
+       tags: databases;
 
      - name: "Install nova"
        yum: name=openstack-nova enablerepo=centos-openstack-ocata,epel state=present
@@ -101,16 +95,42 @@
          - { line: "  <Directory /usr/bin>", insertbefore: "Require all granted" }
 
      - name: "Nova DB-Sync"
-       shell: nova-manage api_db sync
+       shell: "{{ item }}"
+       with_items: 
+         - nova-manage api_db sync
+         - nova-manage cell_v2 map_cell0 --database_connection mysql+pymysql://nova:nova123@192.168.122.238/nova_cell0
+         - nova-manage db sync
+         - nova-manage cell_v2 create_cell --name cell1 --database_connection mysql+pymysql://nova:nova123@192.168.122.238/nova --transport-url rabbit://openstack:password@192.168.122.238:5672
        become: true
        become_method: su
        become_user: nova
        become_flags: '-s /bin/bash'
+       tags: nova_sync
 
+     - name: "restart httpd"
+       service: name=httpd state=restarted
+       tags: httpd
+ 
+     - name: "chnage ownership to nova logs*"
+       shell: chown nova. /var/log/nova/nova-placement-api.log
+       args: 
+         executable: /bin/bash
+       tags: chown
 
-
-
-
-
-
-
+     - name: "start and enable nova services"
+       service: name={{ item }} state=started enabled=yes
+       with_items: 
+         - openstack-nova-api
+         - openstack-nova-cert
+         - openstack-nova-consoleauth
+         - openstack-nova-conductor
+         - openstack-nova-scheduler
+         - openstack-nova-novncproxy
+       tags: nova_service
+     
+     - name: "openstack compute status"
+       shell: source ~/keystonerc && openstack compute service list
+       register: status
+     - debug: var=status.stdout_lines
+  
+#       tags: nova_compute_status  

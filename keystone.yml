@@ -49,4 +49,5 @@
 #         - openstack project create --domain default --description "Service Project" service
 #         - openstack service list
        register: project
-     - debug: var=project.stdout_lines   
+     - debug: var=project.stdout_lines
+       tags: keystone_status   
