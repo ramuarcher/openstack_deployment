@@ -1,0 +1,104 @@
+---
+ - name: "Openstack nwtworking playbook"
+   hosts: openstack
+   remote_user: root
+   gather_facts: yes
+   
+   tasks: 
+     - name: "add neutron user"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword neutron
+       args: 
+         executable: /bin/bash
+       register: neutron_user
+     - debug: var=neutron_user.stdout_lines
+ 
+     - name: "add neutron user in admin role"
+       shell: source ~/keystonerc && openstack role add --project service --user neutron admin
+       args:
+         executable: /bin/bash
+       register: neutron_user_admin
+     - debug: var=neutron_user_admin.stdout_lines
+
+    
+     - name: "add service entry for neutron"
+       shell: source ~/keystonerc && openstack service create --name neutron --description "OpenStack Networking service" network
+       args:
+         executable: /bin/bash
+     - name: "Export controller"
+       shell: export controller={{ ansible_host }}
+       args: 
+        executables: /bin/bash
+       register: neutron_service
+     - debug: var=neutron_service.stdout_lines
+
+
+     - name: "add endpoints for neutron"
+       shell: source ~/keystonerc && openstack endpoint create --region RegionOne network {{ public }} http://$controller:9696 
+       args:
+         executable: /bin/bash
+       with_items: 
+         - public
+         - internal
+         - admin
+    
+     - name: "create nutron db"
+       mysql_db: name=neutron state=present
+       
+     - name: "create user with grant privileges"
+       mysql_user: name=neutron password=neutron123 priv='neutron.*:ALL,GRANT' host={{ item }}
+       with_items: 
+         - localhost
+         - '%'
+
+
+     - name: "Install neutron openstack packages"
+       yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
+       with_items:
+         - openstack-neutron
+         - openstack-neutron-ml2
+         - openstack-neutron-openvswitch 
+     - name: "Backup neutron original configuration"
+       copy: remote_src=True src=/etc/neutron/neutron.conf dest=etc/neutron/neutron.conf.org 
+  
+     - name: "neutron configuration"
+       copy: src=neutron.conf dest=etc/neutron/neutron.conf mode=640 owner=root group=neutron
+      
+    - name: "nuetron l3 agent configuration"
+      lineinfile: dest=/etc/neutron/l3_agent.ini
+                   line={{ item.line }}
+                   insertafter={{ item.insertafter }}
+      with_items:
+        - { line: "interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver", insertafter: "^#?interface_driver = <None>" }
+        - { line: "external_network_bridge = ", insertafter: "^#?external_network_bridge =" }
+        - { line: "external_network_bridge = ", insertafter: "^#?external_network_bridge =" }
+
+    - name: "nuetron dhcp agent configuration"
+      lineinfile: dest=/etc/neutron/dhcp_agent.ini
+                   line={{ item.line }}
+                   insertafter={{ item.insertafter }}
+      with_items:
+        - { line: "interface_driver = neutron.agent.linux.interface.OVSInterfaceDriver", insertafter: "^#?interface_driver = <None>" }
+        - { line: "dhcp_driver = neutron.agent.linux.dhcp.Dnsmasq", insertafter: "^#?dhcp_driver = neutron.agent.linux.dhcp.Dnsmasq" }
+        - { line: "enable_isolated_metadata = True", insertafter: "^#?enable_isolated_metadata = false" }
+
+    - name: "nuetron dhcp agent configuration"
+      lineinfile: dest=/etc/neutron/metadata_agent.ini
+                   line={{ item.line }}
+                   insertafter={{ item.insertafter }}
+      with_items:
+        - { line: "nova_metadata_ip = 192.168.122.185", insertafter: "^#?metadata_agent = 10.0.0.30" }
+        - { line: "metadata_proxy_shared_secret = metadata_secret", insertafter: "^#?metadata_proxy_shared_secret =" }
+
+
+
+    - name: "nuetron dhcp agent configuration"
+      lineinfile: dest=/etc/neutron/ml2_conf.ini
+                   line={{ item.line }}
+                   insertafter={{ item.insertafter }}
+      with_items:
+        - { line: "extension_drivers = port_security", insertafter: '^\[memcache\]' }
+        - { line: "mechanism_drivers = openvswitch,l2population", insertafter: '^\[memcache\]' }
+        - { line: "tenant_network_types =", insertafter: '^\[memcache\]' }
+        - { line: "type_drivers = flat,vlan,gre,vxlan", insertafter: '^\[memcache\]' }
+        
+

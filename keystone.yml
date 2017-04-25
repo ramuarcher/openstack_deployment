@@ -26,8 +26,8 @@
                    line={{ item.line }}
                    insertafter={{ item.insertafter }}
        with_items:
-         - { line: "connection = mysql+pymysql://keystone:keystone123@192.168.122.238/keystone", insertafter: "^#?connection = <None>" }
-         - { line: "servers = 192.168.122.238:11211", insertafter: '^\[memcache\]' }
+         - { line: "connection = mysql+pymysql://keystone:keystone123@192.168.122.185/keystone", insertafter: "^#?connection = <None>" }
+         - { line: "servers = 192.168.122.185:11211", insertafter: '^\[memcache\]' }
          - { line: "driver = memcache", insertafter: '^\[token\]' }
          - { line: "provider = fernet", insertafter: '^\[token\]' }
 

@@ -45,7 +45,7 @@
      - debug: var=service_placement.stdout_lines
 
      - name: "Export controller"
-       shell: export controller=192.168.122.238
+       shell: export controller=192.168.122.185
        args:
          executable: /bin/bash
 
@@ -75,7 +75,7 @@
        with_items:
           - localhost
           - '%'
-       tags: databases;
+       tags: databases
 
      - name: "Install nova"
        yum: name=openstack-nova enablerepo=centos-openstack-ocata,epel state=present
@@ -98,9 +98,9 @@
        shell: "{{ item }}"
        with_items: 
          - nova-manage api_db sync
-         - nova-manage cell_v2 map_cell0 --database_connection mysql+pymysql://nova:nova123@192.168.122.238/nova_cell0
+         - nova-manage cell_v2 map_cell0 --database_connection mysql+pymysql://nova:nova123@192.168.122.185/nova_cell0
          - nova-manage db sync
-         - nova-manage cell_v2 create_cell --name cell1 --database_connection mysql+pymysql://nova:nova123@192.168.122.238/nova --transport-url rabbit://openstack:password@192.168.122.238:5672
+         - nova-manage cell_v2 create_cell --name cell1 --database_connection mysql+pymysql://nova:nova123@192.168.122.185/nova --transport-url rabbit://openstack:password@192.168.122.185:5672
        become: true
        become_method: su
        become_user: nova
@@ -133,4 +133,71 @@
        register: status
      - debug: var=status.stdout_lines
   
-#       tags: nova_compute_status  
+#       tags: nova_compute_status 
+
+     - name: "Install KVM Hypervisor"
+       yum: name={{ item }} state=present
+       with_items: 
+         - qemu-kvm
+         - libvirt
+         - virt-install
+         - bridge-utils
+     - name: "start and enable libvirtd"
+       service: name=libvirtd state=started enabled=yes
+         
+
+     - name: "Install Openstack nova compute package"
+       yum: name=openstack-nova-compute enablerepo=centos-openstack-ocata,epel state=present
+       
+#     - name: "nmcli configuration"
+#       nmcli:
+#         type: bridge
+#         conn_name: br0
+#         ifname: eth0
+#         ip4: 192.168.122.185
+#         gw4: 192.168.122.1
+#         autoconnect: yes
+#         state: present
+#     - name: "add interface"
+#       nmcli:
+#         type: bridge
+#         autoconnect: yes
+#         conn_name: eth0
+#         ifname: eth0
+#         master: br0  
+#         state: present      
+
+#     - name: "remove eth0"
+#       nmcli:
+#         conn_name: System eth0
+#         state: absent
+
+       
+     - name: "nmcli configuration"
+       shell: "{{ item }}"
+       args: 
+         executable: /bin/bash
+       with_items: 
+         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
+         - nmcli c modify br0 ipv4.addresses 192.168.122.220/24 ipv4.method manual
+         - nmcli c modify br0 ipv4.gateway 192.168.122.1
+
+     - name: "remove eth0"
+       nmcli:
+         conn_name: System eth0
+         state: absent
+         
+     - name: "Reboot"
+       command: /sbin/shutdown -r +1
+       async: 0
+       poll: 0
+       ignore_errors: true
+     - name: Waiting for shutdown
+       local_action: wait_for host=192.168.122.220 port=22 state=stopped
+     - name: Waiting for restart
+       local_action: wait_for host=192.168.122.220 port=22 state=started
+     
+     - name: "fetch nmcli info"
+       shell: nmcli c s
+       args: 
+         executable: /bin/bash
