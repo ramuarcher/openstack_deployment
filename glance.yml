@@ -20,19 +20,19 @@
        shell: source ~/keystonerc && openstack service create --name glance --description "OpenStack Image service" image
        args:
          executable: /bin/bash
-  
-     - name: "Export controller"
-       shell: export controller=192.168.122.185
-       args: 
-         executable: /bin/bash
+       register: serviceglance
+     - debug: var=serviceglance.stdout_lines
+
      - name: "add endpoint for glance (public)"
-       shell: source ~/keystonerc && openstack endpoint create --region RegionOne image {{ item }} http://$controller:9292
+       shell: source ~/keystonerc && openstack endpoint create --region RegionOne image {{ item }} http://{{ ansible_eth0.ipv4.address }}:9292
        args:
          executable: /bin/bash
+       register: endpoint
        with_items:
          - public
          - internal
          - admin
+     - debug: var=endpoint 
 
      - name: create database
        mysql_db: name=glance state=present
@@ -56,6 +56,13 @@
        with_items: 
          - glance-api.conf
          - glance-registry.conf
+
+     - name: "replace ansible_host in glance conf"
+       replace: dest=/etc/glance/{{ item }} regexp='192.168.122.238' replace= "{{ ansible_eth0.ipv4.address }}" backup=yes
+       with_items:
+         - glance-api.conf
+         - glance-registry.conf
+
 
      - name: "Glance DB-Syn"
        shell: glance-manage db_sync

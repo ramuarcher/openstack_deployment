@@ -35,7 +35,6 @@
          - ::1
          - localhost
 
-
 #     - name: mysql_secure_installation Command Test
 #       expect:
 #         command: mysql_secure_installation
@@ -76,4 +75,11 @@
          - memcached
      - name: "add openstack user (set any password you like for password)"
        script: rabbitmqctl.sh            
-   
+    
+     - name: "rabbit"
+       shell: {{ item }}
+       args: 
+         executable: /bin/bash
+       with_items: 
+         - rabbitmqctl add_user openstack password
+         - ""rabbitmqctl set_permissions openstack ".*" ".*" ".*""" 

@@ -44,22 +44,19 @@
        register: service_placement
      - debug: var=service_placement.stdout_lines
 
-     - name: "Export controller"
-       shell: export controller=192.168.122.185
-       args:
-         executable: /bin/bash
 
      - name: "add endpoint for nova (public,internal,admin)"
-       shell: source ~/keystonerc && openstack endpoint create --region RegionOne compute {{ item }} http://$controller:8774/v2.1/%\(tenant_id\)s
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne compute {{ item }} http://{{ ansible_eth0.ipv4.address }}:8774/v2.1/%\(tenant_id\)s""
+       args: 
+         executable: /bin/bash
+       register: result
        with_items: 
          - public
          - internal
          - admin
-       register: echo
-     - debug: var={{ item }}.stdout_lines
-       with_items: echo.results
-     
- 
+     - debug: var=result
+#       tags: nova
+
      - name: "create Nova database"
        mysql_db: name={{ item }} state=present
        with_items: 
@@ -75,15 +72,20 @@
        with_items:
           - localhost
           - '%'
-       tags: databases
 
      - name: "Install nova"
        yum: name=openstack-nova enablerepo=centos-openstack-ocata,epel state=present
+
      - name: "Backup Original nova configuation"
        copy: remote_src=True src=/etc/nova/nova.conf dest=/etc/nova/nova.conf.org
 
      - name: "copy nova configuation"
        copy: src=nova.conf dest=/etc/nova/nova.conf mode=640 owner=root group=nova
+
+
+
+     - name: "replace ansible_host in nova conf"
+       replace: dest=/etc/nova/nova.conf regexp='192.168.122.185' replace= "{{ ansible_eth0.ipv4.address }}" backup=yes
        
      - name: "nova-placement-api configuration"
        lineinfile: dest=/etc/httpd/conf.d/00-nova-placement-api.conf 
@@ -98,9 +100,9 @@
        shell: "{{ item }}"
        with_items: 
          - nova-manage api_db sync
-         - nova-manage cell_v2 map_cell0 --database_connection mysql+pymysql://nova:nova123@192.168.122.185/nova_cell0
+         - nova-manage cell_v2 map_cell0 --database_connection mysql+pymysql://nova:nova123@{{ ansible_eth0.ipv4.address }}/nova_cell0
          - nova-manage db sync
-         - nova-manage cell_v2 create_cell --name cell1 --database_connection mysql+pymysql://nova:nova123@192.168.122.185/nova --transport-url rabbit://openstack:password@192.168.122.185:5672
+         - nova-manage cell_v2 create_cell --name cell1 --database_connection mysql+pymysql://nova:nova123@{{ ansible_eth0.ipv4.address }}/nova --transport-url rabbit://openstack:password@{{ ansible_eth0.ipv4.address }}:5672
        become: true
        become_method: su
        become_user: nova
@@ -179,13 +181,9 @@
          executable: /bin/bash
        with_items: 
          - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
-         - nmcli c modify br0 ipv4.addresses 192.168.122.220/24 ipv4.method manual
+         - nmcli c modify br0 ipv4.addresses {{ ansible_eth0.ipv4.address }}/24 ipv4.method manual
          - nmcli c modify br0 ipv4.gateway 192.168.122.1
 
-     - name: "remove eth0"
-       nmcli:
-         conn_name: System eth0
-         state: absent
          
      - name: "Reboot"
        command: /sbin/shutdown -r +1
@@ -193,11 +191,13 @@
        poll: 0
        ignore_errors: true
      - name: Waiting for shutdown
-       local_action: wait_for host=192.168.122.220 port=22 state=stopped
+       local_action: wait_for host={{ ansible_host }} port=22 state=stopped
      - name: Waiting for restart
-       local_action: wait_for host=192.168.122.220 port=22 state=started
+       local_action: wait_for host={{ ansible_host }} port=22 state=started
      
      - name: "fetch nmcli info"
        shell: nmcli c s
        args: 
          executable: /bin/bash
+       register: test
+     - debug: var=test

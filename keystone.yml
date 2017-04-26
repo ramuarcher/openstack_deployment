@@ -2,7 +2,6 @@
  - hosts: openstack
    remote_user: root
    gather_facts: True
-   become: yes
   
    tasks: 
      - name: create database
@@ -12,7 +11,7 @@
        with_items: 
          - localhost
          - '%' 
-     
+ 
      - name: "Install Keystone"
        yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
        with_items: 
@@ -21,33 +20,67 @@
          - python-openstackclient
          - httpd
          - mod_wsgi     
+
      - name: "Keystone configuration"
        lineinfile: dest=/etc/keystone/keystone.conf
                    line={{ item.line }}
                    insertafter={{ item.insertafter }}
        with_items:
-         - { line: "connection = mysql+pymysql://keystone:keystone123@192.168.122.185/keystone", insertafter: "^#?connection = <None>" }
-         - { line: "servers = 192.168.122.185:11211", insertafter: '^\[memcache\]' }
+         - { line: "connection = mysql+pymysql://keystone:keystone123@{{ ansible_eth0.ipv4.address }}/keystone", insertafter: "^#?connection = <None>" }
+         - { line: "servers = {{ ansible_eth0.ipv4.address }}:11211", insertafter: '^\[memcache\]' }
          - { line: "driver = memcache", insertafter: '^\[token\]' }
          - { line: "provider = fernet", insertafter: '^\[token\]' }
+      
+     - name: "keystone DB-Syn"
+       shell: keystone-manage db_sync
+       become: true
+       become_method: su
+       become_user: keystone
+       become_flags: '-s /bin/bash'
+     - name: "export controller"
+       shell: export controller={{ ansible_eth0.ipv4.address }}
+ 
 
-     - name: "Keystone DB Sync copy"
-       copy: src=keystone-db-sync.sh dest=~/keystone-db-sync.sh mode=775 owner=root group=root
-     - name: "Keystone DB Sync"
-       shell: sh keystone-db-sync.sh
+     - name: "keystone manage"
+       shell: "{{ item }}"
+       args: 
+         executable: /bin/bash
+       with_items:
+         - keystone-manage fernet_setup --keystone-user keystone --keystone-group keystone
+         - keystone-manage credential_setup --keystone-user keystone --keystone-group keystone
+         - keystone-manage bootstrap --bootstrap-password adminpassword --bootstrap-admin-url http://{{ ansible_eth0.ipv4.address }}:35357/v3/ --bootstrap-internal-url http://{{ ansible_eth0.ipv4.address }}:35357/v3/ --bootstrap-public-url http://{{ ansible_eth0.ipv4.address }}:5000/v3/ --bootstrap-region-id RegionOne 
+
      - name: "Enableconfig for Keystone ans start Apache httpd"
        shell: ln -s /usr/share/keystone/wsgi-keystone.conf /etc/httpd/conf.d/
      - name: "start and enable apache"
        service: name=httpd state=started enabled=yes
      - name: "keystonerc"
        copy: src=keystonerc dest=~/keystonerc mode=700
+
+     - name: "replace ansible_host"
+       replace: dest=~/keystonerc regexp='192.168.122.18' replace={{ ansible_host }} backup=yes
+
      - name: "Create projectss"
-       shell: . ~/keystonerc && ""openstack project create --domain default --description "Service Project" service""
+       shell: . ~/keystonerc && {{ item }} 
        args:
          executable: /bin/bash
+       register: projects
+       with_items: 
+         - openstack project create --domain default --description "Service Project" service
+         - openstack service list
+         - openstack project list
+     - debug: var=projects
+      
+
+      
+#     - name: "test service"
+#       shell: . ~/keystonerc && {{ item }}
+#       args: 
+#         executable: /bin/bash
+#       register: result
 #       with_items: 
-#         - openstack project create --domain default --description "Service Project" service
-#         - openstack service list
-       register: project
-     - debug: var=project.stdout_lines
-       tags: keystone_status   
+#         - openstack service list 
+#         - openstack project list
+#     - debug: var=result
+
+
