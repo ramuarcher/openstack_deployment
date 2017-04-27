@@ -174,16 +174,6 @@
 #         conn_name: System eth0
 #         state: absent
 
-       
-#     - name: "nmcli configuration"
-#       shell: "{{ item }}"
-#       args: 
-#         executable: /bin/bash
-#       with_items: 
-#         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
-#         - nmcli c modify br0 ipv4.addresses {{ ansible_eth0.ipv4.address }}/24 ipv4.method manual
-#         - nmcli c modify br0 ipv4.gateway 192.168.122.1
-
          
      - name: "Reboot"
        command: /sbin/shutdown -r +1
@@ -212,3 +202,34 @@
          executable: /bin/bash
        register: test
      - debug: var=test
+
+
+     - name: "enable VNC"
+       lineinfile:
+         dest: /etc/nova/nova.conf
+         line: "{{ item }}"
+         insertbefore: EOF
+       with_items:
+         - "[vnc]"
+         - "enabled = True"
+         - "vncserver_listen = 0.0.0.0"
+         - "vncserver_proxyclient_address = {{ ansible_eth0.ipv4.address }}"
+         - "novncproxy_base_url = http://{{ ansible_eth0.ipv4.address }}:6080/vnc_auto.html"
+ 
+     - name: "start and enble nova compute service"
+       service: name=openstack-nova-compute state=started enabled=yes
+       
+  
+     - name: "discover compute node"
+       shell: nova-manage cell_v2 discover_hosts
+       become: true
+       become_method: su
+       become_user: nova
+       become_flags: '-s /bin/bash'
+     
+     - name: "compute service list"
+       shell: source ~/keystonerc && openstack compute service list
+       register: compute
+     - debug: var=compute   
+    
+     
