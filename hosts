@@ -1,7 +1,7 @@
 [openstack]
 #192.168.122.185
 #openstacktest ansible_host=192.168.122.15
-192.168.122.18
+localost ansible_host=192.168.122.41
 
 
 

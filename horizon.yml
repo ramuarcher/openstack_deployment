@@ -1,0 +1,25 @@
+---
+ - name: "Openstack Horizon"
+   hosts: openstack
+   remote_user: root
+   gather_facts: yes
+ 
+   tasks:
+     - name: "Install nova"
+       yum: name=openstack-dashboard enablerepo=centos-openstack-ocata,epel state=present
+
+     - name: "Backup Original horizon configuation"
+       copy: remote_src=True src=/etc/openstack-dashboard/local_settings dest=/etc/openstack-dashboard/local_settings.org
+
+     - name: "copy horizon configuation"
+       copy: src=local_settings dest=/etc/openstack-dashboard/local_settings mode=640 owner=root group=apache
+
+     - name: "replace ansible_host in horizon"
+       replace: dest=/etc/openstack-dashboard/local_settings regexp='10.0.0.30' replace={{ ansible_eth0.ipv4.address }} backup=yes
+
+     - name: "start and enable httpd and memchache"
+       service: name={{ item }} state=started enabled=yes
+       with_items: 
+         - httpd 
+         - memcached 
+

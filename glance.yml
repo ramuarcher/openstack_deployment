@@ -56,12 +56,14 @@
        with_items: 
          - glance-api.conf
          - glance-registry.conf
+       tags: copy
 
      - name: "replace ansible_host in glance conf"
-       replace: dest=/etc/glance/{{ item }} regexp='192.168.122.238' replace= "{{ ansible_eth0.ipv4.address }}" backup=yes
+       replace: dest=/etc/glance/{{ item }} regexp='192.168.122.238' replace={{ ansible_eth0.ipv4.address }} backup=yes
        with_items:
          - glance-api.conf
          - glance-registry.conf
+       tags: glance
 
 
      - name: "Glance DB-Syn"

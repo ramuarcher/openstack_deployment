@@ -82,10 +82,8 @@
      - name: "copy nova configuation"
        copy: src=nova.conf dest=/etc/nova/nova.conf mode=640 owner=root group=nova
 
-
-
      - name: "replace ansible_host in nova conf"
-       replace: dest=/etc/nova/nova.conf regexp='192.168.122.185' replace= "{{ ansible_eth0.ipv4.address }}" backup=yes
+       replace: dest=/etc/nova/nova.conf regexp='192.168.122.185' replace={{ ansible_eth0.ipv4.address }} backup=yes
        
      - name: "nova-placement-api configuration"
        lineinfile: dest=/etc/httpd/conf.d/00-nova-placement-api.conf 
@@ -144,6 +142,8 @@
          - libvirt
          - virt-install
          - bridge-utils
+         - network-manager-applet.x86_64
+
      - name: "start and enable libvirtd"
        service: name=libvirtd state=started enabled=yes
          
@@ -175,14 +175,14 @@
 #         state: absent
 
        
-     - name: "nmcli configuration"
-       shell: "{{ item }}"
-       args: 
-         executable: /bin/bash
-       with_items: 
-         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
-         - nmcli c modify br0 ipv4.addresses {{ ansible_eth0.ipv4.address }}/24 ipv4.method manual
-         - nmcli c modify br0 ipv4.gateway 192.168.122.1
+#     - name: "nmcli configuration"
+#       shell: "{{ item }}"
+#       args: 
+#         executable: /bin/bash
+#       with_items: 
+#         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
+#         - nmcli c modify br0 ipv4.addresses {{ ansible_eth0.ipv4.address }}/24 ipv4.method manual
+#         - nmcli c modify br0 ipv4.gateway 192.168.122.1
 
          
      - name: "Reboot"
@@ -194,6 +194,17 @@
        local_action: wait_for host={{ ansible_host }} port=22 state=stopped
      - name: Waiting for restart
        local_action: wait_for host={{ ansible_host }} port=22 state=started
+
+
+     - name: "nmcli configuration"
+       shell: "{{ item }}"
+       args:
+         executable: /bin/bash
+       with_items:
+         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
+         - nmcli c modify br0 ipv4.addresses {{ ansible_eth0.ipv4.address }}/24 ipv4.method manual
+         - nmcli c modify br0 ipv4.gateway 192.168.122.1
+
      
      - name: "fetch nmcli info"
        shell: nmcli c s
