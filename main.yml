@@ -1,0 +1,13 @@
+---
+ - name: "All in one"
+   hosts: openstack
+   remote_user: root
+   gather_facts: true
+ 
+   tasks: 
+     - include: pre-rrequirement.yml
+     - include: keystone.yml
+     - include: glance.yml
+     - include: nova.yml
+     - include: neutron.yml
+   

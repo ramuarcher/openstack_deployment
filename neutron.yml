@@ -16,8 +16,8 @@
        shell: source ~/keystonerc && openstack role add --project service --user neutron admin
        args:
          executable: /bin/bash
-       register: neutron_user_admin
-     - debug: var=neutron_user_admin.stdout_lines
+       register: neutron_admin
+     - debug: var=neutron_admin.stdout_lines
 
     
      - name: "add service entry for neutron"
@@ -34,14 +34,16 @@
          - internal
          - admin
     
-     - name: "create nutron db"
-       mysql_db: name=neutron state=present
-       
+     - name: "create nutron_ml2 db"
+       mysql_db: name=neutron_ml2 state=present
+       tags: db
+ 
      - name: "create user with grant privileges"
-       mysql_user: name=neutron password=neutron123 priv='neutron.*:ALL,GRANT' host={{ item }}
+       mysql_user: name=neutron password=neutron123 priv='neutron_ml2.*:ALL,GRANT' host={{ item }}
        with_items: 
          - localhost
          - '%'
+       tags: privilege
 
      - name: "Install neutron openstack packages"
        yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
@@ -84,10 +86,10 @@
                    line={{ item.line }}
                    insertafter={{ item.insertafter }}
        with_items:
-         - { line: "nova_metadata_ip = {{ ansible_eth0.ipv4.address }}", insertafter: "^#?nova_metadata_ip= 10.0.0.30" }
+         - { line: "nova_metadata_ip = {{ ansible_eth0.ipv4.address }} ", insertafter: "^#?nova_metadata_ip = 10.0.0.30" }
          - { line: "metadata_proxy_shared_secret = metadata_secret", insertafter: "^#?metadata_proxy_shared_secret =" }
-
-
+       
+       tags: ip
      - name: "nuetron ml2 agent configuration"
        lineinfile: dest=/etc/neutron/plugins/ml2/ml2_conf.ini 
                    line={{ item.line }}
@@ -97,7 +99,7 @@
          - { line: "mechanism_drivers = openvswitch,l2population", insertafter: '^\[ml2\]' }
          - { line: "tenant_network_types =", insertafter: '^\[ml2\]' }
          - { line: "type_drivers = flat,vlan,gre,vxlan", insertafter: '^\[ml2\]' }
-         - { line: "enable_security_group = True", insertafter: '^#?enable_security_group = True' }
+         - { line: "enable_security_group = True", insertafter: '^#?enable_security_group = true' }
          - { line: "firewall_driver = neutron.agent.linux.iptables_firewall.OVSHybridIptablesFirewallDriver", insertafter: '^#?firewall_driver = <None>' }
          - { line: "enable_ipset = True", insertafter: '^#?enable_ipset = True' }
 
@@ -113,25 +115,47 @@
          - { line: "linuxnet_interface_driver = nova.network.linux_net.LinuxOVSInterfaceDriver", insertafter: '^transport_url = ' }
          - { line: "use_neutron = True", insertafter: '^transport_url = ' }
        
-     - name: "neutron auth info"
-       lineinfile:
-         dest: /etc/nova/nova.conf
-         line: "{{ item }}"
-         insertbefore: EOF
-       with_items:
-         - "[neutron]"
-         - "url = http://{{ ansible_eth0.ipv4.address }}:9696"
-         - "auth_url = http://{{ ansible_eth0.ipv4.address }}:35357"
-         - "auth_type = password"
-         - "project_domain_name = default"
-         - "user_domain_name = default"
-         - "region_name = RegionOne"
-         - "project_name = service"
-         - "username = neutron"
-         - "password = servicepassword"
-         - "service_metadata_proxy = True"
-         - "metadata_proxy_shared_secret = metadata_secret"
+#     - name: "neutron auth info"
+#       lineinfile:
+#         dest: /etc/nova/nova.conf
+#         line: "{{ item }}"
+#         insertafter: EOF
+#         state: present
+#       with_items:
+#         - "[neutron]"
+#         - "url = http://{{ ansible_eth0.ipv4.address }}:9696"
+#         - "auth_url = http://{{ ansible_eth0.ipv4.address }}:35357"
+#         - "auth_type = password"
+#         - "project_domain_name = default"
+#         - "user_domain_name = default"
+#         - "region_name = RegionOne"
+#         - "project_name = service"
+#         - "username = neutron"
+#         - "password = servicepassword"
+#         - "service_metadata_proxy = True"
+#         - "metadata_proxy_shared_secret = metadata_secret"
 
+     - name: "neutron auth info"
+       lineinfile: 
+         dest: /etc/nova/nova.conf
+         insertafter: EOF 
+         create: true 
+         state: present
+         line: |
+           [neutron]
+           url = http://{{ ansible_eth0.ipv4.address }}:9696
+           auth_url = http://{{ ansible_eth0.ipv4.address }}:35357
+           auth_type = password
+           project_domain_name = default
+           user_domain_name = default
+           region_name = RegionOne
+           project_name = service
+           username = neutron
+           password = servicepassword
+           service_metadata_proxy = True
+           metadata_proxy_shared_secret = metadata_secret 
+
+       tags: nova test 
      - name: "start and enable openvswitch"
        service: name=openvswitch state=started enabled=yes
        
@@ -151,14 +175,15 @@
        become_method: su
        become_user: neutron
        become_flags: '-s /bin/bash'
+       tags: neutron
 
      - name: "start and enable neutron services"
        service: name={{ item }} state=started enabled=yes
        with_items: 
-         - dhcp-agent
-         - l3-agent
-         - metadata-agent
-         - openvswitch-agent
+         - neutron-dhcp-agent
+         - neutron-l3-agent
+         - neutron-metadata-agent
+         - neutron-openvswitch-agent
 
      - name: "restart nova services"
        service: name={{ item }} state=restarted
