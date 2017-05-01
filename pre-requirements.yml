@@ -55,11 +55,11 @@
 #       action: mysql_user user="" host={{ ansible_host }} state=absent
 #       tags: delete
 
-#     - name: delete anonymous MySQL server user for localhost
-#       action: mysql_user user="" state="absent"
+     - name: delete anonymous MySQL server user for localhost
+       action: mysql_user user="" state="absent"
 
-#     - name: remove the MySQL test database
-#       action: mysql_db db=test state=absent
+     - name: remove the MySQL test database
+       action: mysql_db db=test state=absent
      
      - yum: name=epel-release state=present
      - name: "Install RabbitMQ and Memcached"

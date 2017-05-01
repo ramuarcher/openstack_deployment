@@ -37,7 +37,11 @@
        become_method: su
        become_user: keystone
        become_flags: '-s /bin/bash'
- 
+
+#     - name: "test db"
+#       shell: su -s /bin/bash keystone -c "keystone-manage db_sync"  
+#       args: 
+#         executable: /bin/bash
 
      - name: "keystone manage"
        shell: "{{ item }}"
@@ -46,8 +50,13 @@
        with_items:
          - keystone-manage fernet_setup --keystone-user keystone --keystone-group keystone
          - keystone-manage credential_setup --keystone-user keystone --keystone-group keystone
-         - keystone-manage bootstrap --bootstrap-password adminpassword --bootstrap-admin-url http://{{ ansible_host }}:35357/v3/ --bootstrap-internal-url http://{{ ansible_host }}:35357/v3/ --bootstrap-public-url http://{{ ansible_host }}:5000/v3/ --bootstrap-region-id RegionOne 
+#         - keystone-manage bootstrap --bootstrap-password adminpassword --bootstrap-admin-url http://{{ ansible_host }}:35357/v3/ --bootstrap-internal-url http://{{ ansible_host }}:35357/v3/ --bootstrap-public-url http://{{ ansible_host }}:5000/v3/ --bootstrap-region-id RegionOne 
 
+     - name: "keymanage credential"
+       shell: keystone-manage bootstrap --bootstrap-password adminpassword --bootstrap-admin-url http://{{ ansible_host }}:35357/v3/ --bootstrap-internal-url http://{{ ansible_host }}:35357/v3/ --bootstrap-public-url http://{{ ansible_host }}:5000/v3/ --bootstrap-region-id RegionOne
+       args: 
+         executable: /bin/bash
+ 
      - name: "Enableconfig for Keystone ans start Apache httpd"
        shell: ln -s /usr/share/keystone/wsgi-keystone.conf /etc/httpd/conf.d/
 

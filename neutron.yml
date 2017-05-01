@@ -140,10 +140,10 @@
      - name: "start and enable openvswitch"
        service: name=openvswitch state=started enabled=yes
        
-     - name: "add ovs bridge"
-       shell: ovs-vsctl add-br br-int
-       args: 
-         executable: /bin/bash
+#     - name: "add ovs bridge"
+#       shell: ovs-vsctl add-br br-int
+#       args: 
+#         executable: /bin/bash
 
      - name: "ml2.conf symlink to plugin"
        shell: ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
@@ -171,7 +171,7 @@
        with_items: 
          - openstack-nova-api
          - openstack-nova-compute
-
+         - neutron-server
      - name: "network agent list"
        shell: source ~/keystonerc && openstack network agent list
        register: network
