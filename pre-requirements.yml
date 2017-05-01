@@ -6,7 +6,6 @@
    
    tasks:
      - name: "install NTP Server"
-       yum: name='*' state=latest 
        yum: name=ntp state=present
      - service: name=ntpd state=started enabled=yes
      
@@ -17,7 +16,7 @@
      
      - name: "Install openstack-ocata repo"
        yum: name=centos-release-openstack-ocata state=present
-     - lineinfile: path=/etc/yum.repos.d/CentOS-OpenStack-ocata.repo regexp='^enabled' line='enabled=0'
+     - lineinfile: path=/etc/yum.repos.d/CentOS-OpenStack-ocata.repo regexp='^enabled=1' line='enabled=0'
      
      - name: "Install MariaDB-Server"
        yum: name={{ item }} enablerepo=centos-openstack-ocata state=present
@@ -26,7 +25,7 @@
          - mariadb-server
      - name: Start MySQL service
        sudo: yes
-       service: name=mariadb state=started enabled=true 
+       service: name=mariadb state=started enabled=yes 
      
      - name: update mysql root password for all root accounts
        mysql_user: name=root host={{ item }} password=admin
@@ -53,7 +52,8 @@
        template: src=my.cnf.j2 dest=/root/.my.cnf owner=root mode=0600
 
 #     - name: delete anonymous MySQL server user for server_hostname
-#       action: mysql_user user="" host="{{ ansible_hostname }}" state="absent"
+#       action: mysql_user user="" host={{ ansible_host }} state=absent
+#       tags: delete
 
 #     - name: delete anonymous MySQL server user for localhost
 #       action: mysql_user user="" state="absent"
@@ -69,17 +69,9 @@
          - memcached    
      - name: Start MySQL service
        sudo: yes
-       service: name={{ item }} state=started enabled=true
+       service: name={{ item }} state=started enabled=yes
        with_items:
          - rabbitmq-server
          - memcached
      - name: "add openstack user (set any password you like for password)"
        script: rabbitmqctl.sh            
-    
-#     - name: "rabbit"
-#       shell: {{ item }}
-#       args: 
-#         executable: /bin/bash
-#       with_items: 
-#         - rabbitmqctl add_user openstack password
-#         - "rabbitmqctl set_permissions openstack ".*" ".*" ".*""

@@ -24,7 +24,7 @@
      - debug: var=serviceglance.stdout_lines
 
      - name: "add endpoint for glance (public)"
-       shell: source ~/keystonerc && openstack endpoint create --region RegionOne image {{ item }} http://{{ ansible_eth0.ipv4.address }}:9292
+       shell: source ~/keystonerc && openstack endpoint create --region RegionOne image {{ item }} http://{{ ansible_host }}:9292
        args:
          executable: /bin/bash
        register: endpoint
@@ -59,7 +59,7 @@
        tags: copy
 
      - name: "replace ansible_host in glance conf"
-       replace: dest=/etc/glance/{{ item }} regexp='192.168.122.238' replace={{ ansible_eth0.ipv4.address }} backup=yes
+       replace: dest=/etc/glance/{{ item }} regexp='192.168.122.238' replace={{ ansible_host }} backup=yes
        with_items:
          - glance-api.conf
          - glance-registry.conf

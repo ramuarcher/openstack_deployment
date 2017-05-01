@@ -26,7 +26,7 @@
          executable: /bin/bash
 
      - name: "add endpoints for neutron"
-       shell: source ~/keystonerc && openstack endpoint create --region RegionOne network {{ item }} http://{{ ansible_eth0.ipv4.address }}:9696 
+       shell: source ~/keystonerc && openstack endpoint create --region RegionOne network {{ item }} http://{{ ansible_host }}:9696 
        args:
          executable: /bin/bash
        with_items: 
@@ -59,7 +59,7 @@
        copy: src=neutron.conf dest=/etc/neutron/neutron.conf mode=640 owner=root group=neutron
 
      - name: "replace ansible_host in nova conf"
-       replace: dest=/etc/neutron/neutron.conf regexp='192.168.122.185' replace={{ ansible_eth0.ipv4.address }} backup=yes
+       replace: dest=/etc/neutron/neutron.conf regexp='192.168.122.185' replace={{ ansible_host }} backup=yes
        tags: neutron
       
      - name: "nuetron l3 agent configuration"
@@ -86,7 +86,7 @@
                    line={{ item.line }}
                    insertafter={{ item.insertafter }}
        with_items:
-         - { line: "nova_metadata_ip = {{ ansible_eth0.ipv4.address }} ", insertafter: "^#?nova_metadata_ip = 10.0.0.30" }
+         - { line: "nova_metadata_ip = {{ ansible_host }} ", insertafter: "^#?nova_metadata_ip = 127.0.0.1" }
          - { line: "metadata_proxy_shared_secret = metadata_secret", insertafter: "^#?metadata_proxy_shared_secret =" }
        
        tags: ip
@@ -115,25 +115,6 @@
          - { line: "linuxnet_interface_driver = nova.network.linux_net.LinuxOVSInterfaceDriver", insertafter: '^transport_url = ' }
          - { line: "use_neutron = True", insertafter: '^transport_url = ' }
        
-#     - name: "neutron auth info"
-#       lineinfile:
-#         dest: /etc/nova/nova.conf
-#         line: "{{ item }}"
-#         insertafter: EOF
-#         state: present
-#       with_items:
-#         - "[neutron]"
-#         - "url = http://{{ ansible_eth0.ipv4.address }}:9696"
-#         - "auth_url = http://{{ ansible_eth0.ipv4.address }}:35357"
-#         - "auth_type = password"
-#         - "project_domain_name = default"
-#         - "user_domain_name = default"
-#         - "region_name = RegionOne"
-#         - "project_name = service"
-#         - "username = neutron"
-#         - "password = servicepassword"
-#         - "service_metadata_proxy = True"
-#         - "metadata_proxy_shared_secret = metadata_secret"
 
      - name: "neutron auth info"
        lineinfile: 
@@ -143,8 +124,8 @@
          state: present
          line: |
            [neutron]
-           url = http://{{ ansible_eth0.ipv4.address }}:9696
-           auth_url = http://{{ ansible_eth0.ipv4.address }}:35357
+           url = http://{{ ansible_host }}:9696
+           auth_url = http://{{ ansible_host }}:35357
            auth_type = password
            project_domain_name = default
            user_domain_name = default

@@ -26,8 +26,8 @@
                    line={{ item.line }}
                    insertafter={{ item.insertafter }}
        with_items:
-         - { line: "connection = mysql+pymysql://keystone:keystone123@{{ ansible_eth0.ipv4.address }}/keystone", insertafter: "^#?connection = <None>" }
-         - { line: "servers = {{ ansible_eth0.ipv4.address }}:11211", insertafter: '^\[memcache\]' }
+         - { line: "connection = mysql+pymysql://keystone:keystone123@{{ ansible_host }}/keystone", insertafter: "^#?connection = <None>" }
+         - { line: "servers = {{ ansible_host }}:11211", insertafter: '^\[memcache\]' }
          - { line: "driver = memcache", insertafter: '^\[token\]' }
          - { line: "provider = fernet", insertafter: '^\[token\]' }
       
@@ -37,8 +37,6 @@
        become_method: su
        become_user: keystone
        become_flags: '-s /bin/bash'
-     - name: "export controller"
-       shell: export controller={{ ansible_eth0.ipv4.address }}
  
 
      - name: "keystone manage"
@@ -48,14 +46,16 @@
        with_items:
          - keystone-manage fernet_setup --keystone-user keystone --keystone-group keystone
          - keystone-manage credential_setup --keystone-user keystone --keystone-group keystone
-         - keystone-manage bootstrap --bootstrap-password adminpassword --bootstrap-admin-url http://{{ ansible_eth0.ipv4.address }}:35357/v3/ --bootstrap-internal-url http://{{ ansible_eth0.ipv4.address }}:35357/v3/ --bootstrap-public-url http://{{ ansible_eth0.ipv4.address }}:5000/v3/ --bootstrap-region-id RegionOne 
+         - keystone-manage bootstrap --bootstrap-password adminpassword --bootstrap-admin-url http://{{ ansible_host }}:35357/v3/ --bootstrap-internal-url http://{{ ansible_host }}:35357/v3/ --bootstrap-public-url http://{{ ansible_host }}:5000/v3/ --bootstrap-region-id RegionOne 
 
      - name: "Enableconfig for Keystone ans start Apache httpd"
        shell: ln -s /usr/share/keystone/wsgi-keystone.conf /etc/httpd/conf.d/
+
      - name: "start and enable apache"
        service: name=httpd state=started enabled=yes
+
      - name: "keystonerc"
-       copy: src=keystonerc dest=~/keystonerc mode=700
+       copy: src=keystonerc dest=~/keystonerc mode=600
 
      - name: "replace ansible_host"
        replace: dest=~/keystonerc regexp='192.168.122.18' replace={{ ansible_host }} backup=yes
