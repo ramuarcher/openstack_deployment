@@ -72,6 +72,7 @@
        with_items:
           - localhost
           - '%'
+          - xopenstack
 
      - name: "Install nova"
        yum: name=openstack-nova enablerepo=centos-openstack-ocata,epel state=present

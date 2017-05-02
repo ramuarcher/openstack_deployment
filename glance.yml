@@ -41,6 +41,7 @@
        with_items: 
          - localhost
          - '%'
+         - xopenstack
 
      - name: "Install Glance"
        yum: name=openstack-glance enablerepo=centos-openstack-ocata,epel state=present

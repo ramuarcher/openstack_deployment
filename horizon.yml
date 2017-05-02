@@ -18,7 +18,7 @@
        replace: dest=/etc/openstack-dashboard/local_settings regexp='10.0.0.30' replace={{ ansible_host }} backup=yes
 
      - name: "start and enable httpd and memchache"
-       service: name={{ item }} state=started enabled=yes
+       service: name={{ item }} state=restarted enabled=yes
        with_items: 
          - httpd 
          - memcached 
