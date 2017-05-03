@@ -2,7 +2,7 @@
 #192.168.122.185
 #openstacktest ansible_host=192.168.122.15
 xopenstack ansible_host=103.36.84.142
-#xopenstack ansible_host=192.168.122.11
+#openstack ansible_host=192.168.122.181
 
 [compute]
 compute1 ansible_host=192.168.122.204

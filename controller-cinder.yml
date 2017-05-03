@@ -1,0 +1,122 @@
+---
+ - name: "Install and Configure OpenStack Compute Service (Nova)"   
+   hosts: openstack
+   remote_user: root
+   gather_facts: yes
+   
+   tasks: 
+     - name: "add cinder user (set in service project)"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword cinder 
+       args:
+         executable: /bin/bash
+       register: nova_user
+     - debug: var=nova_user.stdout_lines
+
+     - name: "add cinder user in admin role"
+       shell: source ~/keystonerc && openstack role add --project service --user cinder admin
+       args:
+         executable: /bin/bash
+
+
+     - name: "add service entry for cinder"
+       shell: source ~/keystonerc && ""openstack service create --name cinder --description "OpenStack Block Storage" volume"" 
+       args:
+         executable: /bin/bash
+       register: add_service
+     - debug: var=add_service.stdout_lines
+
+
+
+     - name: "add service entry for cinder2"
+       shell: source ~/keystonerc && ""openstack service create --name cinder2 --description "OpenStack Block Storage" volume2""    
+       args:
+         executable: /bin/bash
+       register: add_service
+     - debug: var=add_service.stdout_lines
+
+
+
+     - name: "add endpoint for nova (public,internal,admin)"
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne volume {{ item }} http://{{ ansible_host }}:8776/v1/%\(tenant_id\)s""
+       args: 
+         executable: /bin/bash
+       register: result1
+       with_items: 
+         - public
+         - internal
+         - admin
+     - debug: var=result1
+#       tags: nova
+
+
+     - name: "add endpoint for nova (public,internal,admin)"
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne volume2 admin http://{{ ansible_host }}:8776/v1/%\(tenant_id\)s""
+       args: 
+         executable: /bin/bash
+       register: result2
+     - debug: var=result2
+
+
+
+     - name: "create cinder database"
+       mysql_db: name=cinder state=present
+
+     - name: "create cinder user"
+       mysql_user: name=nova password=cinder123 priv='cinder.*:ALL,GRANT' host={{ item }}
+       with_items:
+          - localhost
+          - '%'
+          - xopenstack
+
+     - name: "Install cinder"
+       yum: name=openstack-cinder enablerepo=centos-openstack-ocata,epel state=present
+
+     - name: "Backup Original cinder configuation"
+       copy: remote_src=True src=/etc/cinder/cinder.conf dest=/etc/cinder/cinder.conf.org
+
+     - name: "copy cinder configuation"
+       copy: src=cinder.conf dest=/etc/cinder/cinder.conf mode=640 owner=root group=cinder
+
+     - name: "replace ansible_host in cinder conf"
+       replace: dest=/etc/cinder/cinder.conf regexp='10.0.0.30' replace={{ ansible_host }} backup=yes
+       
+
+     - name: "Cinder DB-Sync"
+       shell: cinder-manage db sync
+       become: true
+       become_method: su
+       become_user: cinder
+       become_flags: '-s /bin/bash'
+       ignore_errors: true
+
+     - name: "start and enable nova services"
+       service: name={{ item }} state=started enabled=yes
+       with_items: 
+         - openstack-cinder-api
+         - openstack-cinder-scheduler
+       tags: cinder_service
+     
+     - name: "openstack cinder service"
+       shell: source ~/keystonerc && openstack cinder service list
+       register: status
+     - debug: var=status.stdout_lines
+  
+    
+     - name: "Install openstack-cinder packages"
+       yum: name={{ item }} state=present
+       with_items:
+         - openstack-cinder
+         - python2-crypto targetcli
+
+
+     - name: "Add Glance-api server into cinder conf "
+       lineinfile: dest=/etc/cinder/cinder.conf
+                   line={{ item.line }}
+                   insertbefore={{ item.insertbefore }}
+       with_items:
+         - { line: "glance_api_servers = http://{{ ansible_host }}:9292", insertafter: "transport_url= " }
+         - { line: "# Glance connection info", insertafter: "transport_url= " }
+
+     - name: "start and enable cinder-volume"
+       yum: name=openstack-cinder-volume state=started enabled=yes
+  

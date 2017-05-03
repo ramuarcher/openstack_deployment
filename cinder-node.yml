@@ -1,0 +1,33 @@
+---
+ - name: "Cinder storage node playbook"
+   hosts: storage
+   gather_facts: true
+   remote_user: root
+   
+   tasks: 
+     - name: "Install openstack-cinder packages"
+       yum: name={{ item }} state=present
+       with_items: 
+         - openstack-cinder
+         - python2-crypto targetcli
+    
+     - name: "copy cinder configuation"
+       copy: src=cinder.conf dest=/etc/cinder/cinder.conf mode=640 owner=root group=cinder
+
+     - name: "replace ansible_host in cinder conf"
+       replace: dest=/etc/cinder/cinder.conf regexp='10.0.0.30' replace={{ ansible_host }} backup=yes
+     
+     - name: "Add Glance-api server into cinder conf "
+       lineinfile: dest=/etc/cinder/cinder.conf
+                   line={{ item.line }}
+                   insertbefore={{ item.insertbefore }}
+       with_items:
+         - { line: "glance_api_servers = http://{{ ansible_host }}:9292", insertafter: "transport_url= " }
+         - { line: "# Glance connection info", insertafter: "transport_url= " }
+       
+     - name: "start and enable cinder-volume"
+       yum: name=openstack-cinder-volume state=started enabled=yes
+
+
+
+     

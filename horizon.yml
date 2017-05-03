@@ -5,7 +5,7 @@
 #   gather_facts: yes
 # 
 #   tasks:
-     - name: "Install nova"
+     - name: "Install horizon"
        yum: name=openstack-dashboard enablerepo=centos-openstack-ocata,epel state=present
 
      - name: "Backup Original horizon configuation"

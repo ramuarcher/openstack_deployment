@@ -1,12 +1,12 @@
 ---
- - name: "All in one"
+ - name: "openstack deployment playbooks"
    hosts: openstack
    remote_user: root
    gather_facts: true
  
    tasks: 
-#     - include: pre-requirments.yml
-#     - include: keystone.yml
+     - include: pre-requirments.yml
+     - include: keystone.yml
      - include: glance.yml
      - include: nova.yml
      - include: neutron.yml

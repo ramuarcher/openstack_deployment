@@ -34,7 +34,6 @@
          - 127.0.0.1
          - ::1
          - localhost
-         - xopenstack
 
 #     - name: mysql_secure_installation Command Test
 #       expect:
@@ -64,16 +63,27 @@
        action: mysql_db db=test state=absent
      
      - yum: name=epel-release state=present
+
+     - name: "Install basic tools"
+       yum: name={{ item }} state=present
+       with_items: 
+         - vim
+         - emacs
+         - htop
+         - lshw
+       
      - name: "Install RabbitMQ and Memcached"
        yum: name={{ item }} enablerepo=epel state=present
        with_items: 
          - rabbitmq-server
          - memcached    
+
      - name: Start MySQL service
        sudo: yes
        service: name={{ item }} state=started enabled=yes
        with_items:
          - rabbitmq-server
          - memcached
+
      - name: "add openstack user (set any password you like for password)"
        script: rabbitmqctl.sh            
