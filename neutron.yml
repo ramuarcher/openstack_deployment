@@ -1,10 +1,10 @@
----
- - name: "Openstack nwtworking playbook"
-   hosts: openstack
-   remote_user: root
-   gather_facts: yes
-   
-   tasks: 
+#---
+# - name: "Openstack nwtworking playbook"
+#   hosts: openstack
+#   remote_user: root
+#   gather_facts: yes
+#   
+#   tasks: 
      - name: "add neutron user"
        shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword neutron
        args: 

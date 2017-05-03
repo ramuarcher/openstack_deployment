@@ -1,9 +1,9 @@
----
- - hosts: openstack 
-   remote_user: root
-   gather_facts: yes
-   
-   tasks: 
+#---
+# - hosts: openstack 
+#   remote_user: root
+#   gather_facts: yes
+#   
+#   tasks: 
      - name: "add glance user (set in service project)"
        shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword glance
        args: 

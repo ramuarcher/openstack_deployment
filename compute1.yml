@@ -1,0 +1,99 @@
+---
+ - name: "nova compute node playbook"   
+   hosts: compute
+   remote_user: root
+   gather_facts: yes
+   
+   tasks: 
+     - name: "Install kvm hypervisor"
+       yum: name={{ item }} state=present
+       with_items: 
+         - qemu-kvm
+         - libvirt
+         - virt-install
+         - bridge-utils
+         - network-manager-applet.x86_64
+
+     - name: "start and enable libvirtd"
+       service: name=libvirtd state=started enabled=yes
+
+     - name: "Install epelrepo"
+       yum: name=epel-release state=present 
+ 
+     - name: "Install openstack-ocata repo"
+       yum: name=centos-release-openstack-ocata state=present
+     - lineinfile: path=/etc/yum.repos.d/CentOS-OpenStack-ocata.repo regexp='^enabled=1' line='enabled=0'
+    
+
+     - name: "Install Openstack nova compute package"
+       yum: name=openstack-nova-compute enablerepo=centos-openstack-ocata,epel state=present
+       
+     - name: "Backup Original nova configuation"
+       copy: remote_src=True src=/etc/nova/nova.conf dest=/etc/nova/nova.conf.org
+
+     - name: "copy nova configuation"
+       copy: src=nova-compute.conf dest=/etc/nova/nova.conf mode=640 owner=root group=nova
+
+     - name: "replace ansible_host in nova conf"
+       replace: dest=/etc/nova/nova.conf regexp='10.0.0.30' replace={{ ansible_host }} backup=yes
+
+ 
+     - name: "Reboot"
+       command: /sbin/shutdown -r +1
+       async: 0
+       poll: 0
+       ignore_errors: true
+     - name: Waiting for shutdown
+       local_action: wait_for host={{ ansible_host }} port=22 state=stopped
+     - name: Waiting for restart
+       local_action: wait_for host={{ ansible_host }} port=22 state=started
+
+
+     - name: "nmcli configuration"
+       shell: "{{ item }}"
+       args:
+         executable: /bin/bash
+       with_items:
+         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
+         - nmcli c modify br0 ipv4.addresses {{ ansible_host }}/24 ipv4.method manual
+         - nmcli c modify br0 ipv4.gateway 192.168.122.1
+         - nmcli c modify br0 ipv4.dns 8.8.8.8 
+         - nmcli c add type bridge-slave autoconnect yes con-name eth0 ifname eth0 master br0   
+     
+     - name: "fetch nmcli info"
+       shell: nmcli c s
+       args: 
+         executable: /bin/bash
+       register: test
+     - debug: var=test
+
+
+#     - name: "enable VNC"
+#       lineinfile:
+#         dest: /etc/nova/nova.conf
+#         line: "{{ item }}"
+#         insertbefore: EOF
+#       with_items:
+#         - "[vnc:]"
+#         - "enabled = True"
+#         - "vncserver_listen = 0.0.0.0"
+#         - "vncserver_proxyclient_address = {{ ansible_host }}"
+#         - "novncproxy_base_url = http://{{ ansible_host }}:6080/vnc_auto.html"
+ 
+     - name: "start and enble nova compute service"
+       service: name=openstack-nova-compute state=started enabled=yes
+       
+  
+     - name: "discover compute node"
+       shell: nova-manage cell_v2 discover_hosts
+       become: true
+       become_method: su
+       become_user: nova
+       become_flags: '-s /bin/bash'
+     
+     - name: "compute service list"
+       shell: source ~/keystonerc && openstack compute service list
+       register: compute
+     - debug: var=compute   
+    
+     

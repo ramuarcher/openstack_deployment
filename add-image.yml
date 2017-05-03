@@ -9,34 +9,21 @@
        get_url: 
          url: http://download.cirros-cloud.net/0.3.5/cirros-0.3.5-x86_64-disk.img
          dest: /var/kvm/images
-    
-#     - name: "Add image to glance database"
-#       os_image:
-#         auth:
-#           auth_url: http://localhost/auth/v2.0
-#           username: admin
-#           password: passme
-#           project_name: admin
-#         name: cirros
-#         container_format: bare
-#         disk_format: qcow2
-#         state: present
-#         filename: cirros-0.3.5-x86_64-disk.img
-#         kernel: cirros-vmlinuz
-#         ramdisk: cirros-initrd
-#         properties:
-#           cpu_arch: x86_64
-#           distro: ubuntu 
+
      - name: "Add image to glance database"
-       shell: openstack image create "Ubuntu1604" --file /var/kvm/images/cirros-0.3.5-x86_64-disk.img --disk-format qcow2 --container-format bare --public
+       shell: source ~/keystonerc && openstack image create "cirros" --file /var/kvm/images/cirros-0.3.5-x86_64-disk.img --disk-format qcow2 --container-format bare --public
        args: 
          executable: /bin/bash
        
      - name: "Glance Image list"
-       shell: source ~/keystone && openstack image list
+       shell: source ~/keystonerc && openstack image list
        args: 
          executable: /bin/bash
        register: glance_images
      - debug: var=glance_images.stdout_lines
   
-           
+     - name: "Create m1.small flavor"
+       shell: source ~/keystonerc && openstack flavor create --id 0 --vcpus 2 --ram 1024 --disk 10 m1.small
+       args: 
+         executable: /bin/bash
+      

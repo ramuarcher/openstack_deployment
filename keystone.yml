@@ -1,9 +1,9 @@
----
- - hosts: openstack
-   remote_user: root
-   gather_facts: True
-  
-   tasks: 
+#---
+# - hosts: openstack
+#   remote_user: root
+#   gather_facts: True
+#  
+#   tasks: 
      - name: create database
        mysql_db: name=keystone state=present
      - name: create user

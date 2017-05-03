@@ -1,10 +1,10 @@
----
- - name: "Openstack Horizon"
-   hosts: openstack
-   remote_user: root
-   gather_facts: yes
- 
-   tasks:
+#---
+# - name: "Openstack Horizon"
+#   hosts: openstack
+#   remote_user: root
+#   gather_facts: yes
+# 
+#   tasks:
      - name: "Install nova"
        yum: name=openstack-dashboard enablerepo=centos-openstack-ocata,epel state=present
 

@@ -5,9 +5,12 @@
    gather_facts: true
  
    tasks: 
-     - include: pre-rrequirement.yml
-     - include: keystone.yml
+#     - include: pre-requirments.yml
+#     - include: keystone.yml
      - include: glance.yml
      - include: nova.yml
      - include: neutron.yml
+     - include: horizon.yml
+     - include: add-image.yml
+
    
