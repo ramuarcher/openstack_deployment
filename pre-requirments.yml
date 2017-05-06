@@ -24,6 +24,11 @@
          - MySQL-python
          - mariadb-server
 
+     - name: "maraiadb configuration"
+       lineinfile: dest=/etc/my.cnf
+                   line=character-set-server=utf8
+                   insertafter=[mysqld]
+
      - name: Start MySQL service
        sudo: yes
        service: name=mariadb state=started enabled=yes 
@@ -71,7 +76,8 @@
          - emacs
          - htop
          - lshw
-       
+         - wget
+ 
      - name: "Install RabbitMQ and Memcached"
        yum: name={{ item }} enablerepo=epel state=present
        with_items: 
