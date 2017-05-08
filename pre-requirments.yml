@@ -26,8 +26,12 @@
 
      - name: "maraiadb configuration"
        lineinfile: dest=/etc/my.cnf
-                   line=character-set-server=utf8
-                   insertafter=[mysqld]
+                   line={{ item.line }}
+                   insertafter={{ item.insertafter }}
+       with_items: 
+         - { line: "character-set-server=utf8", insertafter: '^\[mysqld\]' }
+         - { line: "max_connection=4096", insertafter: '^\[mysqld\]' }
+
 
      - name: Start MySQL service
        sudo: yes
