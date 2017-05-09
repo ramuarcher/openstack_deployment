@@ -1,0 +1,105 @@
+---
+ - name: "Swift-proxy playbook"
+   hosts: openstack
+   remote_user: root
+   gather_facts: yes
+   
+   tasks: 
+     - name: "Install swift"
+       yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
+       with_items:
+         - openstack-swift-proxy
+         - python-memcached
+         - openssh-clients
+     - name: "Backup Original cinder configuation"
+       copy: remote_src=True src=/etc/swift/proxy-server.conf dest=/etc/swift/proxy-server.conf.org
+
+     - name: "Specify memchaed server ip in proxy-server.conf"
+       lineinfile: 
+         path: /etc/swift/proxy-server.conf 
+         regexp: '^memcache_servers ='
+         line: 'memcache_servers = {{ ansible_host }}:11211'
+ 
+     - name: "swift conf"
+       lineinfile:
+         dest: /etc/swift/proxy-server.conf
+         insertafter: EOF
+         create: true
+         state: present
+         line: | 
+           auth_uri = http://{{ ansible_host }}:5000
+           auth_url = http://{{ ansible_host }}:35357
+           memcached_servers = {{ ansible_host }}:11211
+           auth_type = password
+           project_domain_name = default
+           user_domain_name = default
+           project_name = service
+           username = swift
+           password = servicepassword
+           delay_auth_decision = true 
+ 
+     - name: "comment old keystone auth varaibles  in swift-proxy conf"
+       lineinfile: path=/etc/swift/proxy-server.conf
+                   regexp={{ item.regexp }}
+                   line={{ item.line }}
+       with_items:
+         - { regexp: "^admin_tenant_name =", line: "#admin_tenant_name = %SERVICE_TENANT_NAME%" }
+         - { regexp: "admin_user =", line: "#admin_user = %SERVICE_USER%" }
+         - { regexp: "admin_password =", line: "#admin_password = %SERVICE_PASSWORD%" }
+         - { regexp: "auth_host =", line: "#auth_host = 127.0.0.1" }
+         - { regexp: "auth_port =", line: "#auth_port = 35357" }
+         - { regexp: "auth_protocol =", line: "#auth_protocol = http" }
+         - { regexp: "signing_dir =", line: "#signing_dir = /tmp/keystone-signing-swift" }
+      
+     - name: "swift hash_path_suffix"
+       lineinfile:
+         path: /etc/swift/swift.conf
+         regexp: '^swift_hash_path_suffix ='
+         line: 'swift_hash_path_suffix = swift_shared_path'
+
+
+     - name: "swift hash_path_preffix"
+       lineinfile:
+         path: /etc/swift/swift.conf
+         line: 'swift_hash_path_prefix = swift_shared_path'
+         state: present
+
+  
+    - name: "Configure ring files"
+      shell: {{ item }}
+      args: 
+        executable: /bin/bash
+
+      with_items: 
+        - swift-ring-builder /etc/swift/account.builder create 12 3 1
+        - swift-ring-builder /etc/swift/container.builder create 12 3 1
+        - swift-ring-builder /etc/swift/object.builder create 12 3 1
+      
+   - name: "swift-ring-builder add account/object/container-builder for stoarage nodes"
+     shell: {{ item }} 
+     args: 
+       excutable: /bin/bash
+     with_items: 
+       - swift-ring-builder /etc/swift/account.builder add r0z0-{{ ansible_host }}:6202/device0 100
+       - swift-ring-builder /etc/swift/container.builder add r0z0-{{ ansible_host }}:6201/device0 100
+       - swift-ring-builder /etc/swift/object.builder add r0z0-{{ ansible_host }}:6200/device0 100
+       - swift-ring-builder /etc/swift/account.builder add r1z1-{{ ansible_host }}:6202/device1 100
+       - swift-ring-builder /etc/swift/container.builder add r1z1-{{ asnible_host }}:6201/device1 100
+       - swift-ring-builder /etc/swift/object.builder add r1z1-{{ ansible_host }}:6200/device1 100
+       - swift-ring-builder /etc/swift/account.builder add r2z2-{{ ansible_host }}:6202/device2 100
+       - swift-ring-builder /etc/swift/container.builder add r2z2-{{ ansible_host }}:6201/device2 100
+       - swift-ring-builder /etc/swift/object.builder add r2z2-{{ ansible_host }}:6200/device2 100
+       - swift-ring-builder /etc/swift/account.builder rebalance
+       - swift-ring-builder /etc/swift/container.builder rebalance
+       - swift-ring-builder /etc/swift/object.builder rebalance
+
+   - name: "chown for swift acc"
+     raw: chown swift. /etc/swift/*.gz
+   
+   - name: "start and enable openstack swift proxy"
+     service: name=openstack-swift-proxy state=restarted enabled=yes
+ 
+   - name: "disable firewall"
+     service: name=firewalld state=stopped enabled=no
+      
+

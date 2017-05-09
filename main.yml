@@ -13,5 +13,4 @@
      - include: horizon.yml
      - include: add-image.yml
      - include: network-conf.yml
-#     - include: controller-cinder.yml
-       
+     - include: controller-cinder.yml

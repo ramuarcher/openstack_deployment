@@ -1,0 +1,196 @@
+---
+ - name: "swift-storage node playbook"
+   hosts: openstack
+   remote_user: root
+   gather_facts: no
+  
+   tasks: 
+     - name: "Install swift-account,swift-object and swift-container"
+       yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
+       with_items: 
+         - openstack-swift-account
+         - openstack-swift-container
+         - openstack-swift-object xfsprogs
+         - rsync
+         - openssh-clients
+
+     - name: "format free space disk"
+       raw: mkfs.xfs -i size=1024 -s size=4096 /dev/vdb
+     
+
+     - name: "create directory"
+       shell: mkdir -p /tmp/node/device{{ item }}
+       args: 
+         executable: /bin/bash
+       with_items:
+         - { item: "0", when: "ansible_host == 103.36.84.142" }
+         - { item: "1", when: "ansible_host == 103.36.84.177" }
+         - { item: "2", when: "ansible_host == 103.36.84.178" }
+#       when: anible_hostname == swiftstorage0
+       tags: test
+
+
+     - name: "create directory"
+       shell: mkdir -p /srv/node/device1
+       args:
+         executable: /bin/bash
+       when: anible_hostname == swiftstorage1
+
+     - name: "create directory"
+       shell: mkdir -p /srv/node/device2
+       args:
+         executable: /bin/bash
+       when: anible_hostname == swiftstorage2
+
+
+
+
+     - name: "mount disk"
+       shell: mount -o noatime,nodiratime,nobarrier /dev/sdb1 /srv/node/device0 
+       args:
+         executable: /bin/bash
+       when: anible_hostname == swiftstorage0
+
+     - name: "mount disk"
+       shell: mount -o noatime,nodiratime,nobarrier /dev/sdb1 /srv/node/device1
+       args:
+         executable: /bin/bash
+       when: anible_hostname == swiftstorage1
+
+     - name: "mount disk"
+       shell: mount -o noatime,nodiratime,nobarrier /dev/sdb1 /srv/node/device2
+       args:
+         executable: /bin/bash
+       when: anible_hostname == swiftstorage2
+
+     - name: "change ownsership"
+       raw: chown -R swift. /srv/node
+      
+     - name: "add entry in fstab"
+       lineinfile:
+         dest: /etc/fstab
+         line: /dev/sdb1               /srv/node/device0       xfs     noatime,nodiratime,nobarrier 0 0
+         insertbefore: EOF
+       when: anible_hostname == swiftstorage0
+  
+     - name: "add entry in fstab"
+       lineinfile:
+         dest: /etc/fstab
+         line: /dev/sdb1               /srv/node/device1       xfs     noatime,nodiratime,nobarrier 0 0
+         insertbefore: EOF
+       when: anible_hostname == swiftstorage1
+
+
+     - name: "add entry in fstab"
+       lineinfile:
+         dest: /etc/fstab
+         line: /dev/sdb1               /srv/node/device2      xfs     noatime,nodiratime,nobarrier 0 0
+         insertbefore: EOF
+       when: anible_hostname == swiftstorage2
+
+
+
+     - name: "copy swift rings to storage nodes"
+       raw: scp /etc/swift/*.gz {{ asnible_host }}:/etc/swift/
+
+    
+     - name: "change ownership"
+       raw: chown swift. /etc/swift/*.gz
+      
+     - name: "swift hash_path_suffix"
+       lineinfile:
+         path: /etc/swift/swift.conf
+         regexp: '^swift_hash_path_suffix ='
+         line: 'swift_hash_path_suffix = swift_shared_path'
+
+
+     - name: "swift hash_path_preffix"
+       lineinfile:
+         path: /etc/swift/swift.conf
+         line: 'swift_hash_path_prefix = swift_shared_path'
+         state: present
+ 
+     - name: "bind_ip in account/object/container"
+       lineinfile:
+         path: /etc/swift/{{ item }}.conf
+         regexp: '^bind	_ip ='
+         line: 'bind_ip = 0.0.0.0'
+       with_items: 
+         - account-server
+         - container-server
+         - object-server
+
+     - name: "configure rsync"
+       lineinfile:
+         dest: /etc/rsyncd.conf
+         insertafter: EOF
+         create: true
+         state: present
+         line: |
+           pid file = /var/run/rsyncd.pid
+           log file = /var/log/rsyncd.log
+           uid = swift
+           gid = swift
+           address = {{ ansible_host }}
+	
+           [account]
+           path            = /srv/node
+           read only       = false
+           write only      = no
+           list            = yes
+           incoming chmod  = 0644
+           outgoing chmod  = 0644
+           max connections = 25
+           lock file =     /var/lock/account.lock
+
+           [container]
+           path            = /srv/node
+           read only       = false
+           write only      = no
+           list            = yes
+           incoming chmod  = 0644
+           outgoing chmod  = 0644
+           max connections = 25
+           lock file =     /var/lock/container.lock
+
+           [object]
+           path            = /srv/node
+           read only       = false
+           write only      = no
+           list            = yes
+           incoming chmod  = 0644
+           outgoing chmod  = 0644
+           max connections = 25
+           lock file =     /var/lock/object.lock
+
+          [swift_server]
+          path            = /etc/swift
+          read only       = true
+          write only      = no
+          list            = yes
+          incoming chmod  = 0644
+          outgoing chmod  = 0644
+          max connections = 5
+          lock file =     /var/lock/swift_server.lock
+
+
+     - name: "start and enable rsync"
+       service: name=rsyncd state=started enabled=yes
+     
+     - name: "start and enable openstack-swift services"
+       service: name={{ item }} state=started enabled=yes
+       with_items: 
+         - openstack-swift-account
+         - openstack-swift-account-auditor
+         - openstack-swift-account-reaper
+         - openstack-swift-account-replicator
+         - openstack-swift-container
+         - openstack-swift-container-auditor
+         - openstack-swift-container-replicator
+         - openstack-swift-container-updater
+         - openstack-swift-object
+         - openstack-swift-object-auditor
+         - openstack-swift-object-replicator
+         - openstack-swift-object-updater  
+
+ 

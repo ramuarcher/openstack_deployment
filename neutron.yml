@@ -179,5 +179,3 @@
 
      - name: "network agent list"
        shell: source ~/keystonerc && openstack network agent list
-       register: network
-     - debug: var=network   
