@@ -4,6 +4,9 @@
    remote_user: root
    gather_facts: yes
    
+   vars: 
+     xswiftnode1: 103.36.84.177
+     xswiftnode2: 103.36.84.178 
    tasks: 
      - name: "Install swift"
        yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
@@ -11,8 +14,8 @@
          - openstack-swift-proxy
          - python-memcached
          - openssh-clients
-     - name: "Backup Original cinder configuation"
-       copy: remote_src=True src=/etc/swift/proxy-server.conf dest=/etc/swift/proxy-server.conf.org
+#     - name: "Backup Original cinder configuation"
+#       copy: remote_src=True src=/etc/swift/proxy-server.conf dest=/etc/swift/proxy-server.conf.org
 
      - name: "Specify memchaed server ip in proxy-server.conf"
        lineinfile: 
@@ -65,41 +68,49 @@
          state: present
 
   
-    - name: "Configure ring files"
-      shell: {{ item }}
-      args: 
-        executable: /bin/bash
-
-      with_items: 
-        - swift-ring-builder /etc/swift/account.builder create 12 3 1
-        - swift-ring-builder /etc/swift/container.builder create 12 3 1
-        - swift-ring-builder /etc/swift/object.builder create 12 3 1
-      
-   - name: "swift-ring-builder add account/object/container-builder for stoarage nodes"
-     shell: {{ item }} 
-     args: 
-       excutable: /bin/bash
-     with_items: 
-       - swift-ring-builder /etc/swift/account.builder add r0z0-{{ ansible_host }}:6202/device0 100
-       - swift-ring-builder /etc/swift/container.builder add r0z0-{{ ansible_host }}:6201/device0 100
-       - swift-ring-builder /etc/swift/object.builder add r0z0-{{ ansible_host }}:6200/device0 100
-       - swift-ring-builder /etc/swift/account.builder add r1z1-{{ ansible_host }}:6202/device1 100
-       - swift-ring-builder /etc/swift/container.builder add r1z1-{{ asnible_host }}:6201/device1 100
-       - swift-ring-builder /etc/swift/object.builder add r1z1-{{ ansible_host }}:6200/device1 100
-       - swift-ring-builder /etc/swift/account.builder add r2z2-{{ ansible_host }}:6202/device2 100
-       - swift-ring-builder /etc/swift/container.builder add r2z2-{{ ansible_host }}:6201/device2 100
-       - swift-ring-builder /etc/swift/object.builder add r2z2-{{ ansible_host }}:6200/device2 100
-       - swift-ring-builder /etc/swift/account.builder rebalance
-       - swift-ring-builder /etc/swift/container.builder rebalance
-       - swift-ring-builder /etc/swift/object.builder rebalance
-
-   - name: "chown for swift acc"
-     raw: chown swift. /etc/swift/*.gz
-   
-   - name: "start and enable openstack swift proxy"
-     service: name=openstack-swift-proxy state=restarted enabled=yes
+     - name: "Configure ring files"
+       shell: "{{ item }}"
+       args: 
+         executable: /bin/bash
+       with_items: 
+         - swift-ring-builder /etc/swift/account.builder create 12 2 1
+         - swift-ring-builder /etc/swift/container.builder create 12 2 1
+         - swift-ring-builder /etc/swift/object.builder create 12 2 1
  
-   - name: "disable firewall"
-     service: name=firewalld state=stopped enabled=no
+#     - name: "ring acccount conf"
+#       raw: swift-ring-builder /etc/swift/account.builder create 12 2 1     
+#
+#     - name: "ring object conf"
+#       raw: swift-ring-builder /etc/swift/object.builder create 12 2 1
+#
+#     - name: "ring container conf"
+#       raw: swift-ring-builder /etc/swift/container.builder create 12 2 1
+
+     - name: "swift-ring-builder add account/object/container-builder for stoarage nodes"
+       shell: "{{ item }}" 
+       args: 
+         executable: /bin/bash
+       with_items: 
+         - swift-ring-builder /etc/swift/account.builder add r0z0-{{ xswiftnode1 }}:6202/device0 100
+         - swift-ring-builder /etc/swift/container.builder add r0z0-{{ xswiftnode1 }}:6201/device0 100
+         - swift-ring-builder /etc/swift/object.builder add r0z0-{{ xswiftnode1 }}:6200/device0 100
+         - swift-ring-builder /etc/swift/account.builder add r1z1-{{ xswiftnode2 }}:6202/device1 100
+         - swift-ring-builder /etc/swift/container.builder add r1z1-{{ xswiftnode2 }}:6201/device1 100
+         - swift-ring-builder /etc/swift/object.builder add r1z1-{{ xswiftnode2 }}:6200/device1 100
+#        - swift-ring-builder /etc/swift/account.builder add r2z2-{{ ansible_host }}:6202/device2 100
+#        - swift-ring-builder /etc/swift/container.builder add r2z2-{{ ansible_host }}:6201/device2 100
+#        - swift-ring-builder /etc/swift/object.builder add r2z2-{{ ansible_host }}:6200/device2 100
+         - swift-ring-builder /etc/swift/account.builder rebalance
+         - swift-ring-builder /etc/swift/container.builder rebalance
+         - swift-ring-builder /etc/swift/object.builder rebalance
+
+     - name: "chown for swift acc"
+       raw: chown swift. /etc/swift/*.gz
+   
+     - name: "start and enable openstack swift proxy"
+       service: name=openstack-swift-proxy state=restarted enabled=yes
+ 
+     - name: "disable firewall"
+       service: name=firewalld state=stopped enabled=no
       
 

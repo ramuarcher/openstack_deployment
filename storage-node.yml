@@ -1,16 +1,26 @@
 ---
  - name: "swift-storage node playbook"
-   hosts: openstack
+   hosts: storage
    remote_user: root
-   gather_facts: no
+   gather_facts: yes
   
    tasks: 
+     - name: "Install openstack-ocata repo"
+       yum: name=centos-release-openstack-ocata state=present
+
+#     - name: "change to enable ocatarepo"
+#       lineinfile: path=/etc/yum.repos.d/CentOS-OpenStack-ocata.repo regexp='^enabled=1' line='enabled=0'
+
+     - name: "install epelrepo"
+       yum: name=epel-release state=present
+
      - name: "Install swift-account,swift-object and swift-container"
        yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
        with_items: 
          - openstack-swift-account
          - openstack-swift-container
-         - openstack-swift-object xfsprogs
+         - openstack-swift-object
+         - xfsprogs
          - rsync
          - openssh-clients
 
@@ -18,50 +28,50 @@
        raw: mkfs.xfs -i size=1024 -s size=4096 /dev/vdb
      
 
-     - name: "create directory"
-       shell: mkdir -p /tmp/node/device{{ item }}
-       args: 
-         executable: /bin/bash
-       with_items:
-         - { item: "0", when: "ansible_host == 103.36.84.142" }
-         - { item: "1", when: "ansible_host == 103.36.84.177" }
-         - { item: "2", when: "ansible_host == 103.36.84.178" }
-#       when: anible_hostname == swiftstorage0
-       tags: test
+#     - name: "create directory"
+#       shell: mkdir -p /tmp/node/device{{ item }}
+#      args: 
+#         executable: /bin/bash
+#       with_items:
+#         - { item: "0", when: "ansible_host == 103.36.84.142" }
+#         - { item: "1", when: "ansible_host == 103.36.84.177" }
+#         - { item: "2", when: "ansible_host == 103.36.84.178" }
+#       when: ansible_hostname == swiftstorage0
+#       tags: test
 
+
+     - name: "create directory"
+       shell: mkdir -p /srv/node/device0
+       args:
+         executable: /bin/bash
+       when: ansible_hostname == "xswiftnode1"
 
      - name: "create directory"
        shell: mkdir -p /srv/node/device1
        args:
          executable: /bin/bash
-       when: anible_hostname == swiftstorage1
-
-     - name: "create directory"
-       shell: mkdir -p /srv/node/device2
-       args:
-         executable: /bin/bash
-       when: anible_hostname == swiftstorage2
+       when: ansible_hostname == "xswiftnode2"
 
 
 
 
      - name: "mount disk"
-       shell: mount -o noatime,nodiratime,nobarrier /dev/sdb1 /srv/node/device0 
+       shell: mount -o noatime,nodiratime,nobarrier /dev/vdb /srv/node/device0 
        args:
          executable: /bin/bash
-       when: anible_hostname == swiftstorage0
+       when: ansible_hostname == "xswiftnode1"
 
      - name: "mount disk"
-       shell: mount -o noatime,nodiratime,nobarrier /dev/sdb1 /srv/node/device1
+       shell: mount -o noatime,nodiratime,nobarrier /dev/vdb /srv/node/device1
        args:
          executable: /bin/bash
-       when: anible_hostname == swiftstorage1
+       when: ansible_hostname == "xswiftnode2"
 
-     - name: "mount disk"
-       shell: mount -o noatime,nodiratime,nobarrier /dev/sdb1 /srv/node/device2
-       args:
-         executable: /bin/bash
-       when: anible_hostname == swiftstorage2
+#     - name: "mount disk"
+#       shell: mount -o noatime,nodiratime,nobarrier /dev/sdb1 /srv/node/device2
+#       args:
+#         executable: /bin/bash
+#       when: ansible_hostname == swiftstorage2
 
      - name: "change ownsership"
        raw: chown -R swift. /srv/node
@@ -69,29 +79,40 @@
      - name: "add entry in fstab"
        lineinfile:
          dest: /etc/fstab
-         line: /dev/sdb1               /srv/node/device0       xfs     noatime,nodiratime,nobarrier 0 0
+         line: /dev/vdb               /srv/node/device0       xfs     noatime,nodiratime,nobarrier 0 0
          insertbefore: EOF
-       when: anible_hostname == swiftstorage0
+       when: ansible_hostname == "xswiftnode1"
   
      - name: "add entry in fstab"
        lineinfile:
          dest: /etc/fstab
-         line: /dev/sdb1               /srv/node/device1       xfs     noatime,nodiratime,nobarrier 0 0
+         line: /dev/vdb               /srv/node/device1       xfs     noatime,nodiratime,nobarrier 0 0
          insertbefore: EOF
-       when: anible_hostname == swiftstorage1
+       when: ansible_hostname == "xswiftnode2"
 
 
-     - name: "add entry in fstab"
-       lineinfile:
-         dest: /etc/fstab
-         line: /dev/sdb1               /srv/node/device2      xfs     noatime,nodiratime,nobarrier 0 0
-         insertbefore: EOF
-       when: anible_hostname == swiftstorage2
+#     - name: "add entry in fstab"
+#       lineinfile:
+#         dest: /etc/fstab
+#         line: /dev/sdb1               /srv/node/device2      xfs     noatime,nodiratime,nobarrier 0 0
+#         insertbefore: EOF
+#       when: ansible_hostname == swiftstorage2
 
 
 
      - name: "copy swift rings to storage nodes"
-       raw: scp /etc/swift/*.gz {{ asnible_host }}:/etc/swift/
+       shell: scp -3 103.36.84.142:/tmp/f1 103.36.84.177:/tmp/
+       args: 
+         executable: /bin/bash
+       tags: scp
+
+#     - name: Copy controller_node-To-storage_nodes (from serverA to serverB,C)
+#       synchronize: src=/etc/swift/*.gz dest=/etc/swift/
+#       delegate_to: 103.36.84.142
+#       tags: scp
+
+
+
 
     
      - name: "change ownership"
@@ -113,12 +134,13 @@
      - name: "bind_ip in account/object/container"
        lineinfile:
          path: /etc/swift/{{ item }}.conf
-         regexp: '^bind	_ip ='
+         regexp: '^bind_ip ='
          line: 'bind_ip = 0.0.0.0'
        with_items: 
          - account-server
          - container-server
          - object-server
+       tags: bind  
 
      - name: "configure rsync"
        lineinfile:
@@ -132,7 +154,6 @@
            uid = swift
            gid = swift
            address = {{ ansible_host }}
-	
            [account]
            path            = /srv/node
            read only       = false
@@ -142,7 +163,6 @@
            outgoing chmod  = 0644
            max connections = 25
            lock file =     /var/lock/account.lock
-
            [container]
            path            = /srv/node
            read only       = false
@@ -152,7 +172,6 @@
            outgoing chmod  = 0644
            max connections = 25
            lock file =     /var/lock/container.lock
-
            [object]
            path            = /srv/node
            read only       = false
@@ -162,17 +181,15 @@
            outgoing chmod  = 0644
            max connections = 25
            lock file =     /var/lock/object.lock
-
-          [swift_server]
-          path            = /etc/swift
-          read only       = true
-          write only      = no
-          list            = yes
-          incoming chmod  = 0644
-          outgoing chmod  = 0644
-          max connections = 5
-          lock file =     /var/lock/swift_server.lock
-
+           [swift_server]
+           path            = /etc/swift
+           read only       = true
+           write only      = no
+           list            = yes
+           incoming chmod  = 0644
+           outgoing chmod  = 0644
+           max connections = 5
+           lock file =     /var/lock/swift_server.lock
 
      - name: "start and enable rsync"
        service: name=rsyncd state=started enabled=yes

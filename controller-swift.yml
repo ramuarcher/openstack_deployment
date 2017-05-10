@@ -1,0 +1,57 @@
+---
+ - name: "Install and Configure OpenStack Object storage"   
+   hosts: openstack
+   remote_user: root
+   gather_facts: yes
+   
+   tasks: 
+     - name: "add swift user (set in service project)"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword swift 
+       args:
+         executable: /bin/bash
+       register: swift_user
+     - debug: var=swift_user.stdout_lines
+
+     - name: "add swift user in admin role"
+       shell: source ~/keystonerc && openstack role add --project service --user swift admin
+       args:
+         executable: /bin/bash
+
+
+     - name: "add service entry for swift"
+       shell: source ~/keystonerc && ""openstack service create --name swift --description "OpenStack Object Storage" object-store"" 
+       args:
+         executable: /bin/bash
+       register: object_service
+     - debug: var=object_service.stdout_lines
+
+
+     - name: "add endpoint for swift (public,internal)"
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne object-store {{ item }} http://{{ ansible_host }}:8080/v1/AUTH_%\(tenant_id\)s""
+       args: 
+         executable: /bin/bash
+       register: end_swift
+       with_items: 
+         - public
+         - internal
+     - debug: var=end_swift
+
+
+     - name: "add endpoint for swift (admin)"
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne object-store admin http://{{ ansible_host }}:8080/v1""
+       args:
+         executable: /bin/bash
+       register: proxy_swift
+     - debug: var=proxy_swift
+
+
+     - name: "Install swift"
+       yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
+       with_items: 
+         - openstack-swift-proxy
+         - python-memcached
+         - openssh-clients
+
+     - name: "Backup Original cinder configuation"
+       copy: remote_src=True src=/etc/swift/proxy-server.conf dest=/etc/swift/proxy-server.conf.org
+
