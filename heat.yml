@@ -1,0 +1,141 @@
+---
+ - name: "Openstack heat playbook"
+   hosts: openstack
+   gather_facts: yes
+   remote_user: root
+   
+   tasks: 
+     - name: "Install openstack-heat"
+       yum: name=openstack-heat-common enablerepo=centos-openstack-ocata,epel state=present
+     
+     - name: "add heat user (set in service project)"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword heat
+       args:
+         executable: /bin/bash
+       register: heat_user
+     - debug: var=heat_user.stdout_lines
+  
+     - name: "add heat user in admin role"
+       shell: source ~/keystonerc && openstack role add --project service --user heat admin
+       args:
+         executable: /bin/bash
+
+     - name: "create a role for heat_stack_owner"
+       shell: source ~/keystonerc && openstack role create {{ item }}
+       args:
+         executable: /bin/bash
+       with_items: 
+         - heat_stack_owner
+         - heat_stack_user
+      
+     - name: "add admin user to heat_stack_role"
+       shell: source ~/keystonerc && openstack role add --project admin --user admin heat_stack_owner 
+       args:
+         executable: /bin/bash
+ 
+
+     - name: "add service entry for heat"
+       shell: source ~/keystonerc && ""openstack service create --name heat --description "OpenStack Orchestration" orchestration""
+       args:
+         executable: /bin/bash
+       register: heat_service
+     - debug: var=heat_service.stdout_lines
+
+
+
+
+     - name: "add service entry for heat-cloudinformation"
+       shell: source ~/keystonerc && ""openstack service create --name heat-cfn --description "OpenStack Orchestration" cloudformation""
+       args:
+         executable: /bin/bash
+       register: cfn_service
+     - debug: var=cfn_service.stdout_lines
+
+
+     - name: "add endpoint for orchestration (public,internal,admin)"
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne orchestration {{ item }} http://{{ ansible_host }}:8004/v1/%\(tenant_id\)s""
+       args:
+         executable: /bin/bash
+       with_items:
+         - public
+         - internal
+         - admin
+
+
+     - name: "add endpoint for cloudformation (public,internal,admin)"
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne cloudformation {{ item }} http://{{ ansible_host }}:8000/v1/""
+       args:
+         executable: /bin/bash
+       with_items:
+         - public
+         - internal
+         - admin
+
+
+     - name: "create heat domain"
+       shell: source ~/keystonerc && ""openstack domain create --description "Stack projects and users" heat""
+       args: 
+         executable: /bin/bash
+       
+
+
+     - name: "add heat_domain_admin user "
+       shell: source ~/keystonerc && openstack user create --domain heat --password servicepassword heat_domain_admin
+       args:
+         executable: /bin/bash
+       register: doamin_user
+     - debug: var=domain_user.stdout_lines
+
+ 
+     - name: "add heat_domain_admin user in admin role"
+       shell: source ~/keystonerc && openstack role add --domain heat --user heat_domain_admin admin
+       args:
+         executable: /bin/bash
+ 
+
+     - name: "create heat database"
+       mysql_db: name=heat state=present
+
+     - name: "create nova user"
+       mysql_user: name=heat password=heat123 priv='heat.*:ALL,GRANT' host={{ item }}
+       with_items: 
+         - localhost
+         - '%'
+         - xopenstack
+
+     - name: "Install openstack-heat packages"
+       yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
+       with_items: 
+         - openstack-heat-api
+         - openstack-heat-api-cfn
+         - openstack-heat-engine
+         - python-heatclient
+
+     - name: "Backup Original heat configuation"
+       copy: remote_src=True src=/etc/heat/heat.conf dest=/etc/heat/heat.conf.org
+
+     - name: "copy heat configuation"
+       copy: src=heat.conf dest=/etc/heat/heat.conf mode=640 owner=root group=heat
+
+     - name: "replace ansible_host in heat conf"
+       replace: dest=/etc/heat/heat.conf regexp='192.168.122.185' replace={{ ansible_host }} backup=yes
+    
+     - name: "heat DB-Sync"
+       shell: heat-manage db_sync
+       become: true
+       become_method: su
+       become_user: heat
+       become_flags: '-s /bin/bash'
+
+
+     - name: "start and enable heat services"
+       service: name={{ item }} state=started enabled=yes
+       with_items:
+         - openstack-heat-api 
+         - openstack-heat-api-cfn
+         - openstack-heat-engine
+
+ 
+
+
+

@@ -48,37 +48,6 @@
      - name: Waiting for restart
        local_action: wait_for host={{ ansible_host }} port=22 state=started
 
-
-     - name: "nmcli configuration"
-       shell: "{{ item }}"
-       args:
-         executable: /bin/bash
-       with_items:
-         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
-         - nmcli c modify br0 ipv4.addresses {{ ansible_host }}/24 ipv4.method manual
-         - nmcli c modify br0 ipv4.gateway 192.168.122.1
-         - nmcli c modify br0 ipv4.dns 8.8.8.8 
-         - nmcli c add type bridge-slave autoconnect yes con-name eth0 ifname eth0 master br0   
-     
-     - name: "fetch nmcli info"
-       shell: nmcli c s
-       args: 
-         executable: /bin/bash
-       register: test
-     - debug: var=test
-
-
-#     - name: "enable VNC"
-#       lineinfile:
-#         dest: /etc/nova/nova.conf
-#         line: "{{ item }}"
-#         insertbefore: EOF
-#       with_items:
-#         - "[vnc:]"
-#         - "enabled = True"
-#         - "vncserver_listen = 0.0.0.0"
-#         - "vncserver_proxyclient_address = {{ ansible_host }}"
-#         - "novncproxy_base_url = http://{{ ansible_host }}:6080/vnc_auto.html"
  
      - name: "start and enble nova compute service"
        service: name=openstack-nova-compute state=started enabled=yes

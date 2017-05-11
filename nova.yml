@@ -166,30 +166,6 @@
      - name: "Copy ifcfg-br0 conf file"
        copy: src=ifcfg-eth0.206 dest=/etc/sysconfig/network-scripts/ifcfg-eth0.206 mode=644 owner=root group=root
      
-       
-#     - name: "nmcli configuration"
-#       nmcli:
-#         type: bridge
-#         conn_name: br0
-#         ifname: eth0
-#         ip4: 192.168.122.185
-#         gw4: 192.168.122.1
-#         autoconnect: yes
-#         state: present
-#     - name: "add interface"
-#       nmcli:
-#         type: bridge
-#         autoconnect: yes
-#         conn_name: eth0
-#         ifname: eth0
-#         master: br0  
-#         state: present      
-
-#     - name: "remove eth0"
-#       nmcli:
-#         conn_name: System eth0
-#         state: absent
-
          
      - name: "Reboot"
        command: /sbin/shutdown -r +1
@@ -204,25 +180,6 @@
 
      - name: "Install Openstack nova compute package"
        yum: name=openstack-nova-compute enablerepo=centos-openstack-ocata,epel state=present
-
-
-#     - name: "nmcli configuration"
-#       shell: "{{ item }}"
-#       args:
-#         executable: /bin/bash
-#       with_items:
-#         - nmcli c add type bridge autoconnect yes con-name br0 ifname br0
-#         - nmcli c modify br0 ipv4.addresses {{ ansible_host }}/24 ipv4.method manual
-#         - nmcli c modify br0 ipv4.gateway 103.36.84.1
-#         - nmcli c modify br0 ipv4.dns 8.8.8.8 
-#         - nmcli c add type bridge-slave autoconnect yes con-name eth0.206 ifname eth0.206 master br0   
-     
-#     - name: "fetch nmcli info"
-#       shell: nmcli c s
-#       args: 
-#         executable: /bin/bash
-#       register: test
-#     - debug: var=test
 
 
      - name: "enable VNC"

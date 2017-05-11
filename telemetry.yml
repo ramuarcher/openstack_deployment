@@ -1,0 +1,106 @@
+---
+ - name: "Openstack Telemetry playbook"
+   hosts: openstack
+   gather_facts: yes
+   remote_user: root
+   
+   tasks: 
+     - name: "Install openstack-ceilmeter packages"
+       yum: name=openstack-ceilometer-compute enablerepo=centos-openstack-ocata,epel state=present
+
+     - name: "Backup Original ceilmeter configuation"
+       copy: remote_src=True src=/etc/ceilometer/ceilometer.conf dest=/etc/ceilometer/ceilometer.conf.org
+
+     - name: "replace ansible_host in heat conf"
+       replace: dest=/etc/heat/heat.conf regexp='192.168.122.185' replace={{ ansible_host }} backup=yes
+     
+     - name: "configure nova for ceilometer"
+       lineinfile: dest=/etc/nova/nova.conf
+                   line={{ item.line }}
+                   insertafter={{ item.insertafter }}
+       with_items:
+         - { line: "instance_usage_audit = True", insertafter: "^log_dir =" }
+         - { line: "instance_usage_audit_period = hour", insertafter: "^log_dir =" }
+         - { line: "notify_on_state_change = vm_and_task_state", insertafter: "^log_dir =" }
+         - { line: "driver = messagingv2", insertafter: "^api_paste_config =" }
+  
+     - name: "start and enable ceilometer services"
+       service: name=openstack-ceilometer-compute state=started enabled=yes
+
+
+     - name: "restart nova  services"
+       service: name=openstack-nova-compute state=restarted
+
+
+     - name: "add ceilometer user (set in service project)"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword ceilometer
+       args:
+         executable: /bin/bash
+       register: ceilometer_user
+     - debug: var=ceilometer_user.stdout_lines
+
+     - name: "add ceilometer user in admin role"
+       shell: source ~/keystonerc && openstack role add --project service --user ceilometer admin
+       args:
+         executable: /bin/bash
+
+
+
+     - name: "add service entry for ceilometer"
+       shell: source ~/keystonerc && ""openstack service create --name ceilometer --description "OpenStack Telemetry" metering""
+       args:
+         executable: /bin/bash
+       register: heat_service
+     - debug: var=heat_service.stdout_lines
+
+
+
+     - name: "add gnocchi user (set in service project)"
+       shell: source ~/keystonerc && openstack user create --domain default --project service --password servicepassword gnocchi
+       args:
+         executable: /bin/bash
+       register: gnocchi_user
+     - debug: var=gnocchi_user.stdout_lines
+
+
+
+     - name: "add service entry for gnocchi"
+       shell: source ~/keystonerc && ""openstack service create --name gnocchi --description "Openstack Metric Service" metric""
+       args:
+         executable: /bin/bash
+       register: metric_service
+     - debug: var=metric_service.stdout_lines
+
+
+     - name: "add endpoint for metric (public,internal,admin)"
+       shell: source ~/keystonerc && ""openstack endpoint create --region RegionOne metric {{ item }} http://{{ ansible_host }}:8041""
+       args:
+         executable: /bin/bash
+       with_items:
+         - public
+         - internal
+         - admin
+
+
+     - name: "Install openstack-ceilometer componet packages"
+       yum: name={{ item }} enablerepo=centos-openstack-ocata,epel state=present
+       with_items: 
+         - openstack-ceilometer-collector
+         - openstack-ceilometer-notification
+         - openstack-ceilometer-central
+         - python-ceilometerclient
+
+
+
+
+     - name: "configure cinder for ceilometer"
+       lineinfile: dest=/etc/cinder/cinder.conf
+                   line='driver = messagingv2'
+                   insertafter='^lock_path ='
+
+
+    - shell: ""cinder-volume-usage-audit --start_time='YYYY-MM-DD HH:MM:SS' --end_time='YYYY-MM-DD HH:MM:SS' --send_actions""
+      arg: 
+        executable: /bin/bash
+      
+  

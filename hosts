@@ -2,7 +2,7 @@
 xopenstack ansible_host=103.36.84.142
 
 [compute]
-compute1 ansible_host=103.36.84
+xopenstack-compute1 ansible_host=103.36.84.179
 
 
 [storage]
